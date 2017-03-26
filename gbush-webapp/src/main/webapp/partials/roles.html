@@ -1,0 +1,49 @@
+<div ng-controller="RolesCtrl">
+    <div class="control-group">
+        <input class="span4" type="text" ng-model="searchText.$" placeholder="Filter the list..">
+        <!--
+         The following defines two buttons used for either hiding or showing the person form. The personForn.show
+         variable in the PersonCtrl determines which button is displayed.
+        -->
+        <button ng-show="!roleForm.show" class="span3 btn" style="margin-left: 0; margin-right: 4px" type="button"
+                ng-click="toggleRoleForm()">Show role form</button>
+        <button ng-show="roleForm.show" class="span3 btn" style="margin-left: 0; margin-right: 4px" type="button"
+                ng-click="toggleRoleForm()">Hide role form</button>
+    </div>
+
+    <div ng-show="roleForm.show">
+        <form class="form-inline" ng-submit="saveRole(roleForm.role)">
+            <input type="text" class="span3" placeholder="RoleId" ng-model="roleForm.role.roleId">
+            <input type="text" class="span4" placeholder="Name" ng-model="roleForm.role.name">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <!--
+             Note that the clear-button here must have the type attribute set to 'button' otherwise it will
+             by default get type=submit. See:
+             http://stackoverflow.com/questions/12319758/angularjs-clicking-a-button-within-a-form-causes-page-refresh
+            -->
+            <button type="button" class="btn" ng-click="clearForm()">Clear form</button>
+        </form>
+    </div>
+
+    <h3>List of roles</h3>
+
+    <table class="table table-striped table-bordered">
+        <thead>
+        <tr>
+            <th style="width: 100px">Operation</th>
+            <th style="width: 20px">RoleId</th>
+            <th>Name</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr ng-repeat="r in roles | orderBy:'name' | filter:searchText">
+            <td style="width: 100px">
+                <button class="btn" ng-click="editRole(r)"><i class="icon-edit"></i></button>
+                <button class="btn" ng-click="deleteRole(r)"><i class="icon-trash"></i></button>
+            </td>
+            <td style="width: 20px">{{r.id}}</td>
+            <td>{{r.name}}</td>
+        </tr>
+        </tbody>
+    </table>
+</div>
