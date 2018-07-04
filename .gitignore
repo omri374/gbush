@@ -1,3 +1,7 @@
 *.jar
 .idea/
 target/
+data/
+papers/
+out/
+.Rproj.user

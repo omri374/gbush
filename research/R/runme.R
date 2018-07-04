@@ -7,16 +7,16 @@ Sys.setlocale(category = "LC_ALL", locale = "Hebrew_Israel.1255")
 library(dplyr)
 library(ggplot2)
 
-source("R/utils.R", encoding = 'WINDOWS-1252')
-source("R/GibushStatTests.R", encoding = 'UTF-8')
+source("R/utils.R", encoding = 'WINDOWS-1255')
+source("R/statistical_tests.R", encoding = 'WINDOWS-1255')
 
 
 ###--- create raw data ---###
 
 xls1 <- readExcel('data/data-excel.xlsx')
 xls2 <- readExcel('data/2018.xlsx')
-#xls <- bind_rows(xls1,xls2)
-xls <- xls1
+xls <- bind_rows(xls1,xls2)
+#xls <- xls1
 cat('length of input data = ',nrow(xls))
 xls <- xls %>% distinct()
 cat('length of input data after removing duplications = ',nrow(xls))
@@ -32,12 +32,13 @@ raw <- parseRawData(xls, exclude_medical = TRUE)
 perSoldierWithMedical <- getDataPerSoldier(rawWithMedical)
 perSoldier <- getDataPerSoldier(raw)
 
+
 perGibushWithMedical <- getDataPerGibush(perSoldierWithMedical)
 perGibush <- getDataPerGibush(perSoldier)
 knitr::kable(perGibush)
 printDescriptiveStats(perSoldierWithMedical,perGibushWithMedical)
 
-perMonth <- perMonthStats(perSoldierWithMedical)
+perMonth <- perMonthStats(perSoldierWithMedical,perGibushWithMedical)
 knitr::kable(perMonth)
 
 scoresDF <- getScores(perSoldier)
@@ -46,6 +47,9 @@ scoresDFWithMedical <- getScores(perSoldierWithMedical)
 
 finisherScores <- scoresDF %>% filter(FinishedFactor ==TRUE)
 nonFinisherScores <- scoresDF %>% filter(FinishedFactor == FALSE)
+
+plotLeavingReason(raw)
+
 
 ##Sociometric
 plotHistogramByFinishers(scoresDF,param_name = 'Sociometric')
@@ -72,22 +76,50 @@ connectionBetweenScoreAndFinish(
   nonFinisherScores = nonFinisherScores$FinalScore,
   header = 'FinalScore')
 
-
+#MiluimScores
+plotHistogramByFinishers(scoresDF,param_name = 'MiluimScores')
+connectionBetweenScoreAndFinish(
+  finishersScores = finisherScores$MiluimScores,
+  nonFinisherScores = nonFinisherScores$MiluimScores,
+  header = 'MiluimScores')
 #Per month
-perMonthTest(finisherScores,nonFinisherScores)
+perMonthTest(finisherScores,nonFinisherScores,metric = 'FinalScore')
 # plotHistogramByFinishers(scoresDF %>% filter(GibushMonth=='אוג'),param_name = 'AvgScore','אוג')
 # plotHistogramByFinishers(scoresDF %>% filter(GibushMonth=='נוב'),param_name = 'AvgScore','נוב')
 # plotHistogramByFinishers(scoresDF %>% filter(GibushMonth=='מרץ'),param_name = 'AvgScore','מרץ')
 
+# Liba vs. non-liba
+connectionBetweenScoreAndFinish(finishersScores = (finisherScores %>% filter(Liba))$FinalScore,nonFinisherScores = (nonFinisherScores %>% filter(Liba))$FinalScore,header = 'Liba final scores test')
+connectionBetweenScoreAndFinish(finishersScores = (finisherScores %>% filter(!Liba))$FinalScore,nonFinisherScores = (nonFinisherScores %>% filter(!Liba))$FinalScore,header = 'Non-Liba final scores test')
+
+
 plotHistogramByFinishersPerMonth(scoresDF,param_name = 'AvgScore')
+
+plotHistogramByFinishersCustomFacet(scoresDF,param_name = 'AvgScore',postfix = 'ליבה מול לא ליבה',facet_formula = formula("Finished~ Liba"))
 
 #per mitam
 perMitamTest(finisherScores,nonFinisherScores)
 
 #Mitam 0 plot
-plotHistogramByFinishers(scoresDF %>% filter(as.numeric(as.character(Mitam))==0),param_name='AvgScore','מתאם 0')
+plotHistogramByFinishers(scoresDF %>% filter(as.numeric(as.character(Mitam))<2),param_name='AvgScore','מתאם 0')
 #Mitam 1,2 plot
-plotHistogramByFinishers(scoresDF %>% filter(as.numeric(as.character(Mitam))>0),param_name='AvgScore', 'מתאם > 0')
+plotHistogramByFinishers(scoresDF %>% filter(as.numeric(as.character(Mitam))>1),param_name='AvgScore', 'מתאם > 0')
+
+
+## Miluim vs. Sadir:
+plotHistogramByFinishersPerJob(perSoldierWithMedical)
+
+connectionBetweenScoreAndFinish(finishersScores = finisherScores$SadirScores,nonFinisherScores = nonFinisherScores$SadirScores,header = 'Sadir scores test')
+## Sadir - Significant
+
+connectionBetweenScoreAndFinish(finishersScores = finisherScores$MiluimScores,nonFinisherScores = nonFinisherScores$MiluimScores,header = 'Miluim scores test')
+## Miluim - significant
+
+
+#only not liba
+connectionBetweenScoreAndFinish(finishersScores = (finisherScores %>% filter(!Liba))$SadirScores,nonFinisherScores = (nonFinisherScores %>% filter(!Liba))$SadirScores,header = 'Sadir scores test')
+connectionBetweenScoreAndFinish(finishersScores = (finisherScores %>% filter(!Liba))$MiluimScores,nonFinisherScores = (nonFinisherScores %>% filter(!Liba))$MiluimScores,header = 'Miluim scores test')
+## Sadir not significant
 
 
 ## Attribute importance
@@ -108,11 +140,11 @@ connectionBetweenScoreAndFinish(
 
 getCorrelationMartix(scoresDF)
 
+
+
 ## Traits plots
-plotHistogramByFinishers(scoresDF,param_name = 'PhysicalSkills')
-
-
-## Connection between traits and score
+traitsPlot(raw)
+####---- Connection between traits and score ----####
 avgScoreCorreation <- connectionBetweenTraitAndAvgScore(scoresDF)
 plotConnectionBetweenTraitsAndMetric(avgScoreCorreation, 'מתאם בין תכונות לציון מעריכים ממוצע')
 
@@ -120,11 +152,30 @@ plotConnectionBetweenTraitsAndMetric(avgScoreCorreation, 'מתאם בין תכו
 unitSuitabilityCorrelation <- connectionBetweenTraitAndUnitSuitability(scoresDF)
 plotConnectionBetweenTraitsAndMetric(unitSuitabilityCorrelation, 'מתאם בין תכונות לציון התאמה ליחידה')
 
-## hit /miss
+####---- hit /miss ----####
 
-hitmiss <- hitMissStats(scoresDF,threshold = 4)
 
-hitmissAnalysis <- hitmissAnalysis(scoresDF)
+#Specific threshold
+hitmiss <- hitMissStats(scoresDF,threshold = 4, estimator = 'AvgScore')
+
+hitmiss_liba <- hitMissStats(scoresDF %>% filter(Liba),threshold = 4, estimator = 'AvgScore')
+hitmiss_nonliba <- hitMissStats(scoresDF %>% filter(!Liba),threshold = 4, estimator = 'AvgScore')
+
+#Specific threshold - final score
+hitmiss_final <- hitMissStats(scoresDF,threshold = 60, estimator = 'FinalScore')
+
+hitmiss_final_liba <- hitMissStats(scoresDF %>% filter(Liba),threshold = 60, estimator = 'FinalScore')
+hitmiss_final_nonliba <- hitMissStats(scoresDF %>% filter(!Liba),threshold = 60, estimator = 'FinalScore')
+
+#Specific threshold - unit suitability
+hitmiss_unitsuitability <- hitMissStats(scoresDF,threshold = 4, estimator = 'UnitSuitability')
+
+hitmiss_unitsuitability_liba <- hitMissStats(scoresDF %>% filter(Liba),threshold = 4, estimator = 'UnitSuitability')
+hitmiss_unitsuitability_nonliba <- hitMissStats(scoresDF %>% filter(!Liba),threshold = 4, estimator = 'UnitSuitability')
+
+
+#All thresholds
+hitmissAnalysisDf <- hitmissAnalysis(scoresDF, estimator = 'FinalScore')
 
 ## PR curve
 library(PRROC)

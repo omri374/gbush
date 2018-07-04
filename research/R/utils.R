@@ -34,6 +34,9 @@ parseRawData <- function(xls,exclude_medical = TRUE){
     
   )
   
+  raw$GibushMonth <- as.character(raw$GibushMonth)
+  raw$GibushMonth <- ifelse(raw$GibushMonth=="אוג","Aug",ifelse(raw$GibushMonth=="נוב","Nov",ifelse(raw$GibushMonth=="מרץ","Mar",raw$GibushMonth)))
+  
   if(exclude_medical){
     rawNoMedical <- raw %>% filter(!MedicalLeave | is.na(MedicalLeave))
     cat("Size after medical removal = ",nrow(rawNoMedical),'.\nRemoved',nrow(raw)-nrow(rawNoMedical),'assessments due to medical reasons\n')
@@ -57,10 +60,12 @@ getDataPerSoldier <- function(raw){
       Maarih5Score = Maarih5Score[1],
       MaarihScores = MaarihScores[1],
       CommanderScores = CommanderScores[1],
+      MiluimScores = mean(c(CommanderScores,Maarih1Score),na.rm = T),
+      SadirScores = ifelse(is.na(Maarih3Score) & is.na(Maarih4Score),NA,mean(c(Maarih3Score,Maarih4Score,Maarih5Score),na.rm = T)),
       Sociometric = Sociometric[1],
       Baror=Baror[1],
       FinalScore = FinalScore[1],
-      Liba = ifelse(Mitam[1]==0,F,T),
+      Liba = ifelse(as.numeric(as.character(Mitam[1]))>1,T,F),
       Mitam = Mitam[1],
       PhysicalSkills = PhysicalSkills[1],
       TeamSkills = TeamSkills[1],
@@ -82,7 +87,7 @@ getDataPerSoldier <- function(raw){
       FinishedMaslulExlMedical = FinishedMaslulExlMedical[1]
       
       
-    )
+    ) 
   
   cat(nrow(perSoldier),'soldiers in dataset\n')
   
@@ -119,6 +124,7 @@ printDescriptiveStats <- function(perSoldier,perGibush){
   
   cat('\nNumber of assessments(gibushim) that finished training:',numbersOfPeriodsFinishedMaslul,"
   \nNumber of soldiers in analysis:",numberOfSoldiers,"
+\nNumber of soldiers in finished maslulim (that we know about):",numberOfSoldiersInFinishedMaslulim,"
 \nNumber of soldiers who started maslul:",numberOfSoldiersThatStartedMaslul,"
   \nNumber of soldiers that finished training:",numberOfFinishers,"
     \nNumber of soldiers that didn't finish training:",numberOfNonFinishers,"
@@ -131,28 +137,30 @@ printDescriptiveStats <- function(perSoldier,perGibush){
 }
 
 translate <- function(english_string){
-  return(english_string)
+  #return(english_string)
   dict <- list()
   
-  dict[['Sociometric']]  <- '??????????????????'
-  dict[['Baror']] <-'??????????'
-  dict[['GibushMonth']] <-'??????????'
-  dict[['GibushYear']] <-'??????'
-  dict[['Date']] <-'??????????'
+  dict[['Sociometric']]  <- 'סוציומטרי'
+  dict[['Baror']] <-'בראור'
+  dict[['GibushMonth']] <-'חודש'
+  dict[['GibushYear']] <-'שנה'
+  dict[['Date']] <-'תאריך'
   dict[['MegabeshFirst']] <-'???? ????????'
   dict[['MegabeshLast']] <-'???? ??????????'
   dict[['CommanderName']] <-'???? ????????'
-  dict[['FinalScore']] <-'???????? ????????'
-  dict[['Mitam']] <-'????????'
-  dict[['PhysicalSkills']] <-'?????????? ??????????'
-  dict[['TeamSkills']] <-'?????????? ????????'
-  dict[['PressureSkills']] <-'?????????? ?????????? ??????'
-  dict[['MotivationSkills']] <-'???????????????? ????????????'
-  dict[['CognitiveSkills']] <-'?????????? ??????????'
-  dict[['CommanderSkills']] <-'?????????? ??????????'
-  dict[['UnitSuitability']] <-'?????????? ????????????'
-  dict[['FinishedMaslul']] <-'???????? ??????????' 
-  dict[['AvgScore']] <-'???????? ?????????????? ??????????' 
+  dict[['FinalScore']] <-'ציון סופי'
+  dict[['Mitam']] <-'מתאם'
+  dict[['PhysicalSkills']] <-'יכולת פיזית'
+  dict[['TeamSkills']] <-'עבודת צוות'
+  dict[['PressureSkills']] <-'עמידה בתנאי לחץ'
+  dict[['MotivationSkills']] <-'מוטיבציה'
+  dict[['CognitiveSkills']] <-'יכולת חשיבה'
+  dict[['CommanderSkills']] <-'יכולת פיקוד'
+  dict[['UnitSuitability']] <-'התאמה ליחידה'
+  dict[['FinishedMaslul']] <-'סיים מסלול' 
+  dict[['AvgScore']] <-'ציון מעריכים ממוצע' 
+  dict[['MiluimScores']] <-'ציון ממוצע - מעריכי מילואים'
+  dict[['SadirScores']] <-'ציון ממוצע - מעריכים סדירים'
   return(dict[[english_string]])
 }
 
@@ -168,11 +176,12 @@ plotLeavingReason <- function(raw){
   ggplot(reasonsDF, aes(x=Var1,y=Freq)) + 
     geom_bar(stat="identity") + 
     geom_text(aes(y = Freq+.02,label = percent(Freq)),position = position_dodge(width = .1)) + 
-    xlab('????????') + ylab('????????') + ggtitle('???????? ?????? ??????????????') + ggtech::theme_tech(theme="etsy")
+    xlab('סיבה') + ylab('אחוז מהעוזבים') + ggtitle('סיבות לעזיבת מסלול') + ggtech::theme_tech(theme="etsy")
 }
 
 
-perMonthStats <- function(perSoldier){
+perMonthStats <- function(perSoldier,perGibush){
+  perSoldier <- inner_join(perSoldier,perGibush,by=c('GibushMonth','GibushYear')) %>% filter(MaslulEnded) %>% rename(StartedMaslul = StartedMaslul.x)
   perMonth <- perSoldier %>% 
     group_by(GibushMonth) %>% 
     summarize(
@@ -197,6 +206,8 @@ getScores <- function(perSoldier){
       Baror,
       Sociometric,
       AvgScore, 
+      MiluimScores,
+      SadirScores,
       PressureSkills,
       PhysicalSkills,
       MotivationSkills,
@@ -238,15 +249,15 @@ getScoresPlot <- function(scoresDF,save_to_file=F){
 plotDensityByFinishers <- function(scoresDF,param_name = 'Sociometric'){
   library(ggplot2)
   scores <- scoresDF %>% select(param_name,FinishedFactor) %>% rename_(param = param_name, Finished = 'FinishedFactor') #%>% mutate(param = param/nrow(scoresDF))
-  scores$Finished <- ifelse(as.character(scores$Finished),'????????','???? ????????')
+  scores$Finished <- ifelse(as.character(scores$Finished),'סיימו מסלול','לא סיימו מסלול')
   p = ggplot(scores, aes(x=param,fill = Finished)) +
     #geom_histogram(position="identity", colour="grey40", alpha=0.9, bins = 10) +
     geom_density(aes(y=..density..*10), alpha=0.5) +
     facet_grid(Finished~.) + 
-    ggtitle(paste("?????????????? ?????????? :",translate(param_name))) + 
-    ylab('?????????????????? %') + 
-    xlab(translate(param_name)) + 
-    ggtech::theme_tech(theme = 'etsy')+ ggtech::scale_fill_tech(theme="etsy")
+    ggtitle(paste("התפלגות הערכות עבור :",translate(param_name))) + 
+    ylab('% מהחיילים') + 
+    xlab(translate(param_name)) #+ 
+    #ggtech::theme_tech(theme = 'etsy')+ ggtech::scale_fill_tech(theme="etsy")
   
   p
 }
@@ -254,18 +265,18 @@ plotDensityByFinishers <- function(scoresDF,param_name = 'Sociometric'){
 plotHistogramByFinishers <- function(scoresDF,param_name = 'Sociometric', postfix = ""){
   library(ggplot2)
   scores <- scoresDF %>% select(param_name,FinishedFactor) %>% rename_(param = param_name, Finished = 'FinishedFactor') #%>% mutate(param = param/nrow(scoresDF))
-  scores$Finished <- ifelse(as.character(scores$Finished),'????????','???? ????????')
+  scores$Finished <- ifelse(as.character(scores$Finished),'סיימו מסלול','לא סיימו מסלול')
   p = ggplot(scores, aes(x=param,fill = Finished)) +
     geom_histogram(alpha=0.8, bins = 7,aes(fill = Finished)) +
     #geom_histogram(data = scores %>% filter(Finished ==FALSE),position="identity", colour="grey40", alpha=0.3, bins = 7,position = 'dodge') +
     #geom_histogram(data = scores %>% filter(is.na(Finished)),position="identity", colour="grey50", alpha=0.3, bins = 7,position = 'dodge') +
     
     #geom_density(aes(y=..density..*10), alpha=0.5) +
-    #facet_grid(Finished~.) + 
-    ggtitle(paste("?????????????? ?????????? :",translate(param_name),postfix)) + 
-    ylab('?????????????????? %') + 
-    xlab(translate(param_name)) + 
-    ggtech::theme_tech(theme = 'etsy')+ ggtech::scale_fill_tech(theme="etsy")
+    facet_grid(Finished~.) + 
+    ggtitle(paste("התפלגות הערכות עבור :",translate(param_name))) + 
+    ylab('מספר חיילים') + 
+    xlab(translate(param_name))# + 
+    #ggtech::theme_tech(theme = 'etsy')+ ggtech::scale_fill_tech(theme="etsy")
   
   p
 }
@@ -273,18 +284,77 @@ plotHistogramByFinishers <- function(scoresDF,param_name = 'Sociometric', postfi
 plotHistogramByFinishersPerMonth <- function(scoresDF,param_name = 'Sociometric', postfix = ""){
   library(ggplot2)
   scores <- scoresDF %>% select(param_name,FinishedFactor,GibushMonth) %>% rename_(param = param_name, Finished = 'FinishedFactor') #%>% mutate(param = param/nrow(scoresDF))
-  scores$Finished <- ifelse(as.character(scores$Finished),'????????','???? ????????')
+  scores$Finished <- ifelse(as.character(scores$Finished),'סיימו מסלול','לא סיימו מסלול')
   p = ggplot(scores, aes(x=param,fill = Finished)) +
     geom_histogram(alpha=0.8, bins = 7,aes(fill = Finished)) +
     #geom_histogram(data = scores %>% filter(Finished ==FALSE),position="identity", colour="grey40", alpha=0.3, bins = 7,position = 'dodge') +
     #geom_histogram(data = scores %>% filter(is.na(Finished)),position="identity", colour="grey50", alpha=0.3, bins = 7,position = 'dodge') +
     
     #geom_density(aes(y=..density..*10), alpha=0.5) +
-    facet_grid(GibushMonth~.) + 
-    ggtitle(paste("?????????????? ?????????? :",translate(param_name),postfix)) + 
-    ylab('?????????????????? %') + 
+    facet_grid(Finished~GibushMonth) + 
+    ggtitle(paste("התפלגות הערכות עבור :",translate(param_name))) + 
+    ylab('מספר חיילים') + 
     xlab(translate(param_name)) + 
     ggtech::theme_tech(theme = 'etsy')+ ggtech::scale_fill_tech(theme="etsy")
   
   p
+}
+
+plotHistogramByFinishersCustomFacet <- function(scoresDF,param_name = 'Sociometric', postfix = "",facet_formula = formula("Finished~GibushMonth")){
+  library(ggplot2)
+  scores <- scoresDF %>% select(param_name,FinishedFactor,GibushMonth,Mitam,Liba,PressureSkills,CommanderSkills,TeamSkills,UnitSuitability,CognitiveSkills,MotivationSkills) %>% rename_(param = param_name, Finished = 'FinishedFactor') #%>% mutate(param = param/nrow(scoresDF))
+  scores$Finished <- ifelse(as.character(scores$Finished),'סיימו מסלול','לא סיימו מסלול')
+  p = ggplot(scores, aes(x=param,fill = Finished)) +
+    geom_histogram(alpha=0.8, bins = 7,aes(fill = Finished)) +
+    #geom_histogram(data = scores %>% filter(Finished ==FALSE),position="identity", colour="grey40", alpha=0.3, bins = 7,position = 'dodge') +
+    #geom_histogram(data = scores %>% filter(is.na(Finished)),position="identity", colour="grey50", alpha=0.3, bins = 7,position = 'dodge') +
+    
+    #geom_density(aes(y=..density..*10), alpha=0.5) +
+    facet_grid(facet_formula) + 
+    ggtitle(paste("התפלגות הערכות עבור :",translate(param_name)),postfix) + 
+    ylab('מספר חיילים') + 
+    xlab(translate(param_name)) + 
+    ggtech::theme_tech(theme = 'etsy')+ ggtech::scale_fill_tech(theme="etsy")
+  
+  p
+}
+
+plotHistogramByFinishersPerJob <- function(perSoldierWithMedical, postfix = ""){
+  library(ggplot2)
+  library(gridExtra)
+  scores <- perSoldierWithMedical %>% select(MiluimScores,SadirScores) %>% reshape2::melt()
+  scores$variable <- ifelse(scores$variable=='MiluimScores','מילואים','סדיר')
+  g <- ggplot(scores,aes(x = value)) + geom_density(aes(y=..density..), alpha=1.0) + facet_grid(variable ~.) + 
+    ggtitle('התפלגות הערכות - מילואים לעומת סדיר') + 
+    ylab('אחוז חיילים') + 
+    xlab('הערכה')# + 
+  
+  return(g)
+  
+  get_hist_per_job <- function(scores){
+  #scores$Finished = scores$FinishedFactor
+  p1 = ggplot(scores, aes(x=MiluimScores)) + #,fill = Finished)) +
+    geom_histogram(alpha=0.8, bins = 7) + #,aes(fill = Finished)) +
+    ggtitle('התפלגות הערכות - מילואים לעומת סדיר') + 
+    ylab('מספר חיילים') + 
+    xlab('Miluim score')# + 
+    #ggtech::theme_tech(theme = 'etsy')+ ggtech::scale_fill_tech(theme="etsy")
+  
+  p2 = ggplot(scores, aes(x=SadirScores)) + #,fill = Finished)) +
+    geom_histogram(alpha=0.8, bins = 7) + #,aes(fill = Finished)) +
+    ylab('% of soldiers') + 
+    xlab('Sadir score') #+ 
+#    ggtech::theme_tech(theme = 'etsy')+ ggtech::scale_fill_tech(theme="etsy")
+  
+  gridExtra::grid.arrange(p1,p2)
+  
+  }
+}
+
+plotConnectionBetweenTraitsAndMetric <- function(correlation_results,title = ""){
+  correlations <- data.frame(trait = sapply(names(correlation_results),translate), val = correlation_results)
+  ggplot(data = correlations,aes(x = trait,y = val,fill = trait)) + geom_col() + 
+    xlab('תכונה') + ylab('מתאם ספירמן') + 
+  ggtitle(title) + 
+    ggtech::theme_tech(theme = 'airbnb')+ theme(axis.text.x = element_text(angle = 90, hjust = 1),legend.position="none")
 }
