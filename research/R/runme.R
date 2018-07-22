@@ -7,16 +7,13 @@ Sys.setlocale(category = "LC_ALL", locale = "Hebrew_Israel.1255")
 library(dplyr)
 library(ggplot2)
 
-source("R/utils.R", encoding = 'WINDOWS-1255')
-source("R/statistical_tests.R", encoding = 'WINDOWS-1255')
+source("R/utils.R")#, encoding = 'WINDOWS-1255')
+source("R/statistical_tests.R")#, encoding = 'WINDOWS-1255')
 
 
 ###--- create raw data ---###
 
-xls1 <- readExcel('data/data-excel.xlsx')
-xls2 <- readExcel('data/2018.xlsx')
-xls <- bind_rows(xls1,xls2)
-#xls <- xls1
+xls <- readExcel('data/data-excel.xlsx')
 cat('length of input data = ',nrow(xls))
 xls <- xls %>% distinct()
 cat('length of input data after removing duplications = ',nrow(xls))
@@ -48,40 +45,73 @@ scoresDFWithMedical <- getScores(perSoldierWithMedical)
 finisherScores <- scoresDF %>% filter(FinishedFactor ==TRUE)
 nonFinisherScores <- scoresDF %>% filter(FinishedFactor == FALSE)
 
+finisherScoresWMedical <- scoresDFWithMedical %>% filter(FinishedFactor ==TRUE)
+nonFinisherScoresWMedical <- scoresDFWithMedical %>% filter(FinishedFactor == FALSE)
+
+
 plotLeavingReason(raw)
 
 
 ##Sociometric
-plotHistogramByFinishers(scoresDF,param_name = 'Sociometric')
+sociometric <- plotHistogramByFinishers(scoresDF,param_name = 'Sociometric')
+ggsave("out/Sociometric.png",plot = sociometric,width = 300,height = 150,units = "mm")
 connectionBetweenScoreAndFinish(finishersScores = finisherScores$Sociometric,nonFinisherScores = nonFinisherScores$Sociometric,header = 'Sociometric')
 
+sociomedical <- plotHistogramByFinishers(scoresDFWithMedical,param_name = 'Sociometric')
+ggsave("out/Sociometric_with_medical.png",plot = sociomedical,width = 300,height = 150,units = "mm")
+
+connectionBetweenScoreAndFinish(finishersScores = finisherScoresWMedical$Sociometric,nonFinisherScores = nonFinisherScoresWMedical$Sociometric,header = 'Sociometric')
+
+
 ##Baror
-plotHistogramByFinishers(scoresDF,param_name = 'Baror')
+baror <- plotHistogramByFinishers(scoresDF,param_name = 'Baror')
+ggsave("out/Baror.png",plot = baror,width = 300,height = 150,units = "mm")
+
 connectionBetweenScoreAndFinish(
   finishersScores = finisherScores$Baror,
   nonFinisherScores = nonFinisherScores$Baror,
   header = 'Baror')
 
+#with medical
+connectionBetweenScoreAndFinish(
+  finishersScores = finisherScoresWMedical$Baror,
+  nonFinisherScores = nonFinisherScoresWMedical$Baror,
+  header = 'Baror')
+
 #AvgScore
-plotHistogramByFinishers(scoresDF,param_name = 'AvgScore')
+avgscore <- plotHistogramByFinishers(scoresDF,param_name = 'AvgScore')
 connectionBetweenScoreAndFinish(
   finishersScores = finisherScores$AvgScore,
   nonFinisherScores = nonFinisherScores$AvgScore,
   header = 'AvgScore')
+ggsave("out/AvgScore.png",plot = avgscore,width = 300,height = 150,units = "mm")
 
 #FinalScore
-plotHistogramByFinishers(scoresDF,param_name = 'FinalScore')
+finalscore <- plotHistogramByFinishers(scoresDF,param_name = 'FinalScore')
 connectionBetweenScoreAndFinish(
   finishersScores = finisherScores$FinalScore,
   nonFinisherScores = nonFinisherScores$FinalScore,
   header = 'FinalScore')
+ggsave("out/FinalScore.png",plot = finalscore,width = 300,height = 150,units = "mm")
+
+#FinalScore
+final_medical <- plotHistogramByFinishers(scoresDFWithMedical,param_name = 'FinalScore')
+connectionBetweenScoreAndFinish(
+  finishersScores = finisherScoresWMedical$FinalScore,
+  nonFinisherScores = nonFinisherScoresWMedical$FinalScore,
+  header = 'FinalScore')
+ggsave("out/FinalScoreWitMedical.png",plot = final_medical,width = 300,height = 150,units = "mm")
+
 
 #MiluimScores
-plotHistogramByFinishers(scoresDF,param_name = 'MiluimScores')
+miluim <- plotHistogramByFinishers(scoresDF,param_name = 'MiluimScores')
 connectionBetweenScoreAndFinish(
   finishersScores = finisherScores$MiluimScores,
   nonFinisherScores = nonFinisherScores$MiluimScores,
   header = 'MiluimScores')
+ggsave("out/MiluimScores.png",plot = miluim,width = 300,height = 150,units = "mm")
+
+
 #Per month
 perMonthTest(finisherScores,nonFinisherScores,metric = 'FinalScore')
 # plotHistogramByFinishers(scoresDF %>% filter(GibushMonth=='◊ê◊ï◊í'),param_name = 'AvgScore','◊ê◊ï◊í')
@@ -101,9 +131,9 @@ plotHistogramByFinishersCustomFacet(scoresDF,param_name = 'AvgScore',postfix = '
 perMitamTest(finisherScores,nonFinisherScores)
 
 #Mitam 0 plot
-plotHistogramByFinishers(scoresDF %>% filter(as.numeric(as.character(Mitam))<2),param_name='AvgScore','◊û◊™◊ê◊ù 0')
+plotHistogramByFinishers(scoresDF %>% filter(as.numeric(as.character(Mitam))<2),param_name='AvgScore','Ï‡ ÏÈ·‰')
 #Mitam 1,2 plot
-plotHistogramByFinishers(scoresDF %>% filter(as.numeric(as.character(Mitam))>1),param_name='AvgScore', '◊û◊™◊ê◊ù > 0')
+plotHistogramByFinishers(scoresDF %>% filter(as.numeric(as.character(Mitam))>1),param_name='AvgScore', 'ÏÈ·‰')
 
 
 ## Miluim vs. Sadir:
@@ -143,14 +173,29 @@ getCorrelationMartix(scoresDF)
 
 
 ## Traits plots
-traitsPlot(raw)
+traitsplot <- traitsPlot(rawWithMedical)
+ggsave("out/traitsHistograms.png",traitsplot,height=150,width = 300, units = "mm")
+
+traits_liba <- traitsPlot(rawWithMedical %>% filter(Liba == TRUE))
+ggsave("out/traitsHistogramsLiba.png",traits_liba,height=150,width = 300, units = "mm")
+
+traits_non_liba <- traitsPlot(rawWithMedical %>% filter(Liba == FALSE))
+ggsave("out/traitsHistogramsNonLiba.png",traits_non_liba,height=150,width = 300, units = "mm")
+
+
 ####---- Connection between traits and score ----####
 avgScoreCorreation <- connectionBetweenTraitAndAvgScore(scoresDF)
 plotConnectionBetweenTraitsAndMetric(avgScoreCorreation, '◊û◊™◊ê◊ù ◊ë◊ô◊ü ◊™◊õ◊ï◊†◊ï◊™ ◊ú◊¶◊ô◊ï◊ü ◊û◊¢◊®◊ô◊õ◊ô◊ù ◊û◊û◊ï◊¶◊¢')
 
 
-unitSuitabilityCorrelation <- connectionBetweenTraitAndUnitSuitability(scoresDF)
-plotConnectionBetweenTraitsAndMetric(unitSuitabilityCorrelation, '◊û◊™◊ê◊ù ◊ë◊ô◊ü ◊™◊õ◊ï◊†◊ï◊™ ◊ú◊¶◊ô◊ï◊ü ◊î◊™◊ê◊û◊î ◊ú◊ô◊ó◊ô◊ì◊î')
+unitSuitabilityCorrelation_liba <- connectionBetweenTraitAndUnitSuitability(scoresDFWithMedical %>% filter(Liba))
+unitSuitabilityCorrelation_nonliba <- connectionBetweenTraitAndUnitSuitability(scoresDFWithMedical %>% filter(!Liba))
+spearman_liba <- plotConnectionBetweenTraitsAndMetric(unitSuitabilityCorrelation_liba, 'ÏÈ·‰: ‰Ó˙‡Ì ˘Ï ÎÏ ˙ÎÂ‰ Â˘Ï ˆÈÂÔ ‰˙‡Ó‰ ÏÈÁÈ„‰')
+spearman_nonliba <- plotConnectionBetweenTraitsAndMetric(unitSuitabilityCorrelation_nonliba, 'Ï‡ ÏÈ·‰: ‰Ó˙‡Ì ˘Ï ÎÏ ˙ÎÂ‰ Â˘Ï ˆÈÂÔ ‰˙‡Ó‰ ÏÈÁÈ„‰')
+ggsave("out/spearman_liba.png",spearman_liba,height=150,width = 300, units = "mm")
+ggsave("out/spearman_nonliba.png",spearman_nonliba,height=150,width = 300, units = "mm")
+
+
 
 ####---- hit /miss ----####
 
@@ -170,12 +215,17 @@ hitmiss_final_nonliba <- hitMissStats(scoresDF %>% filter(!Liba),threshold = 60,
 #Specific threshold - unit suitability
 hitmiss_unitsuitability <- hitMissStats(scoresDF,threshold = 4, estimator = 'UnitSuitability')
 
-hitmiss_unitsuitability_liba <- hitMissStats(scoresDF %>% filter(Liba),threshold = 4, estimator = 'UnitSuitability')
-hitmiss_unitsuitability_nonliba <- hitMissStats(scoresDF %>% filter(!Liba),threshold = 4, estimator = 'UnitSuitability')
+hitmiss_unitsuitability_liba <- hitMissStats(scoresDFWithMedical %>% filter(Liba),threshold = 4, estimator = 'UnitSuitability')
+hitmiss_unitsuitability_nonliba <- hitMissStats(scoresDFWithMedical %>% filter(!Liba),threshold = 4, estimator = 'UnitSuitability')
 
 
 #All thresholds
-hitmissAnalysisDf <- hitmissAnalysis(scoresDF, estimator = 'FinalScore')
+hitmissAnalysisDf <- hitmissAnalysis(scoresDF, estimator = 'UnitSuitability')
+
+#All thresholds
+hitmissAnalysisDf <- hitmissAnalysis(scoresDF, estimator = 'FinalScore',range = seq(0,100,5))
+
+
 
 ## PR curve
 library(PRROC)

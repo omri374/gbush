@@ -9,8 +9,7 @@ print(knitr::kable(aucs))
 
 
 predictionPlot <- function(scoresDF,group_name = 'ALL', estimator = 'AvgScore'){
-  source("R/GibushStatTests.R")
-  
+
   
   precDFTotal <- data.frame(thresh = as.numeric(NA),
                             precision = as.numeric(NA),

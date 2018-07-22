@@ -8,38 +8,38 @@ library(ggplot2)
 library(ggtech) #remotes::install_github("ricardo-bion/ggtech", dependencies=TRUE)
 
 
-readExcel <- function(path = "data/data-excel.xlsx"){
-#  library(readxl)
+readExcel <- function(path = "data/data-excel.xlsx",verbose=F){
+  #  library(readxl)
   sheet = 'raw'
   suppressWarnings({
     raw <- readxl::read_xlsx(path = path,sheet = sheet)
   })
   head(raw)
-  cat("Size = ",nrow(raw),'\n')
+  if(verbose) cat("Size = ",nrow(raw),'\n')
   raw <- raw %>% unique()
-  cat("Size after duplicate removal = ",nrow(raw),'\n')
+  if(verbose) cat("Size after duplicate removal = ",nrow(raw),'\n')
   raw
 }
 
 
-parseRawData <- function(xls,exclude_medical = TRUE){
-
+parseRawData <- function(xls,exclude_medical = TRUE, verbose = F){
+  
   ## Set up finished column (medical related or not)
   raw <- xls %>% mutate(
     megabesh = paste(MegashFirst,MegabeshLast),
     StartedMaslul = !is.na(Finished),
     FinishedMaslul = ifelse(Finished == 1,TRUE,ifelse(Finished == 0,FALSE,NA)),
     MedicalLeave = ifelse(LeavingReason == 'Medical' & FinishedMaslul == FALSE,TRUE,ifelse(is.na(FinishedMaslul),NA,FALSE)),
-    FinishedMaslulExlMedical = ifelse(FinishedMaslul == TRUE,TRUE,ifelse(FinishedMaslul==FALSE & MedicalLeave == FALSE,FALSE,NA))
-    
+    FinishedMaslulExlMedical = ifelse(FinishedMaslul == TRUE,TRUE,ifelse(FinishedMaslul==FALSE & MedicalLeave == FALSE,FALSE,NA)),
+    Liba = ifelse(as.numeric(as.character(Mitam))>1,T,F)
   )
   
   raw$GibushMonth <- as.character(raw$GibushMonth)
-  raw$GibushMonth <- ifelse(raw$GibushMonth=="ΰεβ","Aug",ifelse(raw$GibushMonth=="πεα","Nov",ifelse(raw$GibushMonth=="ξψυ","Mar",raw$GibushMonth)))
+  raw$GibushMonth <- ifelse(raw$GibushMonth=="ΧΧ•Χ’","Aug",ifelse(raw$GibushMonth=="Χ Χ•Χ‘","Nov",ifelse(raw$GibushMonth=="ΧΧ¨Χ¥","Mar",raw$GibushMonth)))
   
   if(exclude_medical){
     rawNoMedical <- raw %>% filter(!MedicalLeave | is.na(MedicalLeave))
-    cat("Size after medical removal = ",nrow(rawNoMedical),'.\nRemoved',nrow(raw)-nrow(rawNoMedical),'assessments due to medical reasons\n')
+    if(verbose) cat("Size after medical removal = ",nrow(rawNoMedical),'.\nRemoved',nrow(raw)-nrow(rawNoMedical),'assessments due to medical reasons\n')
     return(rawNoMedical)
   }
   
@@ -47,7 +47,7 @@ parseRawData <- function(xls,exclude_medical = TRUE){
 }
 
 
-getDataPerSoldier <- function(raw){
+getDataPerSoldier <- function(raw, verbose=F){
   perSoldier <- raw %>% dplyr::group_by(Code) %>% 
     dplyr::summarize(
       GibushMonth = GibushMonth[1],
@@ -89,7 +89,7 @@ getDataPerSoldier <- function(raw){
       
     ) 
   
-  cat(nrow(perSoldier),'soldiers in dataset\n')
+  if(verbose) cat(nrow(perSoldier),'soldiers in dataset\n')
   
   return(perSoldier)
 }
@@ -137,30 +137,27 @@ printDescriptiveStats <- function(perSoldier,perGibush){
 }
 
 translate <- function(english_string){
-  #return(english_string)
+  return(english_string)
   dict <- list()
   
-  dict[['Sociometric']]  <- 'ρεφιεξθψι'
-  dict[['Baror']] <-'αψΰεψ'
-  dict[['GibushMonth']] <-'ηεγω'
-  dict[['GibushYear']] <-'ωπδ'
-  dict[['Date']] <-'ϊΰψικ'
-  dict[['MegabeshFirst']] <-'???? ????????'
-  dict[['MegabeshLast']] <-'???? ??????????'
-  dict[['CommanderName']] <-'???? ????????'
-  dict[['FinalScore']] <-'φιεο ρετι'
-  dict[['Mitam']] <-'ξϊΰν'
-  dict[['PhysicalSkills']] <-'ιλεμϊ τιζιϊ'
-  dict[['TeamSkills']] <-'ςαεγϊ φεεϊ'
-  dict[['PressureSkills']] <-'ςξιγδ αϊπΰι μηυ'
-  dict[['MotivationSkills']] <-'ξεθιαφιδ'
-  dict[['CognitiveSkills']] <-'ιλεμϊ ηωιαδ'
-  dict[['CommanderSkills']] <-'ιλεμϊ τιχεγ'
-  dict[['UnitSuitability']] <-'δϊΰξδ μιηιγδ'
-  dict[['FinishedMaslul']] <-'ριιν ξρμεμ' 
-  dict[['AvgScore']] <-'φιεο ξςψιλιν ξξεφς' 
-  dict[['MiluimScores']] <-'φιεο ξξεφς - ξςψιλι ξιμεΰιν'
-  dict[['SadirScores']] <-'φιεο ξξεφς - ξςψιλιν ργιψιν'
+  dict[['Sociometric']]  <- '?????????'
+  dict[['Baror']] <-'?????'
+  dict[['GibushMonth']] <-'????'
+  dict[['GibushYear']] <-'???'
+  dict[['Date']] <-'?????'
+  dict[['FinalScore']] <-'???? ????'
+  dict[['Mitam']] <-'????'
+  dict[['PhysicalSkills']] <-'????? ?????'
+  dict[['TeamSkills']] <-'????? ????'
+  dict[['PressureSkills']] <-'????? ????? ???'
+  dict[['MotivationSkills']] <-'????????'
+  dict[['CognitiveSkills']] <-'????? ?????'
+  dict[['CommanderSkills']] <-'????? ?????'
+  dict[['UnitSuitability']] <-'????? ??????'
+  dict[['FinishedMaslul']] <-'???? ?????' 
+  dict[['AvgScore']] <-'???? ??????? ?????' 
+  dict[['MiluimScores']] <-'???? ????? - ?????? ???????'
+  dict[['SadirScores']] <-'???? ????? - ??????? ??????'
   return(dict[[english_string]])
 }
 
@@ -176,7 +173,7 @@ plotLeavingReason <- function(raw){
   ggplot(reasonsDF, aes(x=Var1,y=Freq)) + 
     geom_bar(stat="identity") + 
     geom_text(aes(y = Freq+.02,label = percent(Freq)),position = position_dodge(width = .1)) + 
-    xlab('ριαδ') + ylab('ΰηεζ ξδςεζαιν') + ggtitle('ριαεϊ μςζιαϊ ξρμεμ') + ggtech::theme_tech(theme="etsy")
+    xlab('Reason') + ylab('% of dropouts') + ggtitle('Reasons for dropouts') + ggtech::theme_tech(theme="etsy")
 }
 
 
@@ -249,15 +246,15 @@ getScoresPlot <- function(scoresDF,save_to_file=F){
 plotDensityByFinishers <- function(scoresDF,param_name = 'Sociometric'){
   library(ggplot2)
   scores <- scoresDF %>% select(param_name,FinishedFactor) %>% rename_(param = param_name, Finished = 'FinishedFactor') #%>% mutate(param = param/nrow(scoresDF))
-  scores$Finished <- ifelse(as.character(scores$Finished),'ριιξε ξρμεμ','μΰ ριιξε ξρμεμ')
+  scores$Finished <- ifelse(as.character(scores$Finished),'Χ΅Χ™Χ™ΧΧ• ΧΧ΅ΧΧ•Χ','ΧΧ Χ΅Χ™Χ™ΧΧ• ΧΧ΅ΧΧ•Χ')
   p = ggplot(scores, aes(x=param,fill = Finished)) +
     #geom_histogram(position="identity", colour="grey40", alpha=0.9, bins = 10) +
     geom_density(aes(y=..density..*10), alpha=0.5) +
     facet_grid(Finished~.) + 
-    ggtitle(paste("δϊτμβεϊ δςψλεϊ ςαεψ :",translate(param_name))) + 
-    ylab('% ξδηιιμιν') + 
+    ggtitle(paste("Estimation distribution for :",translate(param_name))) + 
+    ylab('% of soldiers') + 
     xlab(translate(param_name)) #+ 
-    #ggtech::theme_tech(theme = 'etsy')+ ggtech::scale_fill_tech(theme="etsy")
+  #ggtech::theme_tech(theme = 'etsy')+ ggtech::scale_fill_tech(theme="etsy")
   
   p
 }
@@ -265,26 +262,25 @@ plotDensityByFinishers <- function(scoresDF,param_name = 'Sociometric'){
 plotHistogramByFinishers <- function(scoresDF,param_name = 'Sociometric', postfix = ""){
   library(ggplot2)
   scores <- scoresDF %>% select(param_name,FinishedFactor) %>% rename_(param = param_name, Finished = 'FinishedFactor') #%>% mutate(param = param/nrow(scoresDF))
-  scores$Finished <- ifelse(as.character(scores$Finished),'ριιξε ξρμεμ','μΰ ριιξε ξρμεμ')
+  scores$Finished <- ifelse(as.character(scores$Finished),'Χ΅Χ™Χ™ΧΧ• ΧΧ΅ΧΧ•Χ','ΧΧ Χ΅Χ™Χ™ΧΧ• ΧΧ΅ΧΧ•Χ')
   p = ggplot(scores, aes(x=param,fill = Finished)) +
-    geom_histogram(alpha=0.8, bins = 7,aes(fill = Finished)) +
+    #geom_histogram(alpha=0.8, bins = 7,aes(fill = Finished)) +
     #geom_histogram(data = scores %>% filter(Finished ==FALSE),position="identity", colour="grey40", alpha=0.3, bins = 7,position = 'dodge') +
     #geom_histogram(data = scores %>% filter(is.na(Finished)),position="identity", colour="grey50", alpha=0.3, bins = 7,position = 'dodge') +
     
-    #geom_density(aes(y=..density..*10), alpha=0.5) +
+    geom_density(aes(y=..density..*10), alpha=0.5) +
     facet_grid(Finished~.) + 
-    ggtitle(paste("δϊτμβεϊ δςψλεϊ ςαεψ :",translate(param_name))) + 
-    ylab('ξρτψ ηιιμιν') + 
-    xlab(translate(param_name))# + 
+    ggtitle(paste("Χ”ΧªΧ¤ΧΧ’Χ•Χª Χ”ΧΆΧ¨Χ›Χ•Χª ΧΆΧ‘Χ•Χ¨ :",translate(param_name),postfix)) + 
+    ylab('ΧΧ΅Χ¤Χ¨ Χ—Χ™Χ™ΧΧ™Χ') + 
     #ggtech::theme_tech(theme = 'etsy')+ ggtech::scale_fill_tech(theme="etsy")
-  
-  p
+    
+    p
 }
 
 plotHistogramByFinishersPerMonth <- function(scoresDF,param_name = 'Sociometric', postfix = ""){
   library(ggplot2)
   scores <- scoresDF %>% select(param_name,FinishedFactor,GibushMonth) %>% rename_(param = param_name, Finished = 'FinishedFactor') #%>% mutate(param = param/nrow(scoresDF))
-  scores$Finished <- ifelse(as.character(scores$Finished),'ριιξε ξρμεμ','μΰ ριιξε ξρμεμ')
+  scores$Finished <- ifelse(as.character(scores$Finished),'Χ΅Χ™Χ™ΧΧ• ΧΧ΅ΧΧ•Χ','ΧΧ Χ΅Χ™Χ™ΧΧ• ΧΧ΅ΧΧ•Χ')
   p = ggplot(scores, aes(x=param,fill = Finished)) +
     geom_histogram(alpha=0.8, bins = 7,aes(fill = Finished)) +
     #geom_histogram(data = scores %>% filter(Finished ==FALSE),position="identity", colour="grey40", alpha=0.3, bins = 7,position = 'dodge') +
@@ -292,8 +288,8 @@ plotHistogramByFinishersPerMonth <- function(scoresDF,param_name = 'Sociometric'
     
     #geom_density(aes(y=..density..*10), alpha=0.5) +
     facet_grid(Finished~GibushMonth) + 
-    ggtitle(paste("δϊτμβεϊ δςψλεϊ ςαεψ :",translate(param_name))) + 
-    ylab('ξρτψ ηιιμιν') + 
+    ggtitle(paste("Χ”ΧªΧ¤ΧΧ’Χ•Χª Χ”ΧΆΧ¨Χ›Χ•Χª ΧΆΧ‘Χ•Χ¨ :",translate(param_name),postfix)) + 
+    ylab('ΧΧ΅Χ¤Χ¨ Χ—Χ™Χ™ΧΧ™Χ') + 
     xlab(translate(param_name)) + 
     ggtech::theme_tech(theme = 'etsy')+ ggtech::scale_fill_tech(theme="etsy")
   
@@ -303,7 +299,7 @@ plotHistogramByFinishersPerMonth <- function(scoresDF,param_name = 'Sociometric'
 plotHistogramByFinishersCustomFacet <- function(scoresDF,param_name = 'Sociometric', postfix = "",facet_formula = formula("Finished~GibushMonth")){
   library(ggplot2)
   scores <- scoresDF %>% select(param_name,FinishedFactor,GibushMonth,Mitam,Liba,PressureSkills,CommanderSkills,TeamSkills,UnitSuitability,CognitiveSkills,MotivationSkills) %>% rename_(param = param_name, Finished = 'FinishedFactor') #%>% mutate(param = param/nrow(scoresDF))
-  scores$Finished <- ifelse(as.character(scores$Finished),'ριιξε ξρμεμ','μΰ ριιξε ξρμεμ')
+  scores$Finished <- ifelse(as.character(scores$Finished),'Χ΅Χ™Χ™ΧΧ• ΧΧ΅ΧΧ•Χ','ΧΧ Χ΅Χ™Χ™ΧΧ• ΧΧ΅ΧΧ•Χ')
   p = ggplot(scores, aes(x=param,fill = Finished)) +
     geom_histogram(alpha=0.8, bins = 7,aes(fill = Finished)) +
     #geom_histogram(data = scores %>% filter(Finished ==FALSE),position="identity", colour="grey40", alpha=0.3, bins = 7,position = 'dodge') +
@@ -311,8 +307,8 @@ plotHistogramByFinishersCustomFacet <- function(scoresDF,param_name = 'Sociometr
     
     #geom_density(aes(y=..density..*10), alpha=0.5) +
     facet_grid(facet_formula) + 
-    ggtitle(paste("δϊτμβεϊ δςψλεϊ ςαεψ :",translate(param_name)),postfix) + 
-    ylab('ξρτψ ηιιμιν') + 
+    ggtitle(paste("Χ”ΧªΧ¤ΧΧ’Χ•Χª Χ”ΧΆΧ¨Χ›Χ•Χª ΧΆΧ‘Χ•Χ¨ :",translate(param_name),postfix)) + 
+    ylab('ΧΧ΅Χ¤Χ¨ Χ—Χ™Χ™ΧΧ™Χ') + 
     xlab(translate(param_name)) + 
     ggtech::theme_tech(theme = 'etsy')+ ggtech::scale_fill_tech(theme="etsy")
   
@@ -323,38 +319,38 @@ plotHistogramByFinishersPerJob <- function(perSoldierWithMedical, postfix = ""){
   library(ggplot2)
   library(gridExtra)
   scores <- perSoldierWithMedical %>% select(MiluimScores,SadirScores) %>% reshape2::melt()
-  scores$variable <- ifelse(scores$variable=='MiluimScores','ξιμεΰιν','ργιψ')
+  scores$variable <- ifelse(scores$variable=='MiluimScores','???????','????')
   g <- ggplot(scores,aes(x = value)) + geom_density(aes(y=..density..), alpha=1.0) + facet_grid(variable ~.) + 
-    ggtitle('δϊτμβεϊ δςψλεϊ - ξιμεΰιν μςεξϊ ργιψ') + 
-    ylab('ΰηεζ ηιιμιν') + 
-    xlab('δςψλδ')# + 
+    ggtitle('Χ”ΧªΧ¤ΧΧ’Χ•Χª Χ”ΧΆΧ¨Χ›Χ•Χª - ΧΧ™ΧΧ•ΧΧ™Χ ΧΧΆΧ•ΧΧª Χ΅Χ“Χ™Χ¨') + 
+    ylab('ΧΧ—Χ•Χ– Χ—Χ™Χ™ΧΧ™Χ') + 
+    xlab('Χ”ΧΆΧ¨Χ›Χ”')# + 
   
   return(g)
   
   get_hist_per_job <- function(scores){
-  #scores$Finished = scores$FinishedFactor
-  p1 = ggplot(scores, aes(x=MiluimScores)) + #,fill = Finished)) +
-    geom_histogram(alpha=0.8, bins = 7) + #,aes(fill = Finished)) +
-    ggtitle('δϊτμβεϊ δςψλεϊ - ξιμεΰιν μςεξϊ ργιψ') + 
-    ylab('ξρτψ ηιιμιν') + 
-    xlab('Miluim score')# + 
+    #scores$Finished = scores$FinishedFactor
+    p1 = ggplot(scores, aes(x=MiluimScores)) + #,fill = Finished)) +
+      geom_histogram(alpha=0.8, bins = 7) + #,aes(fill = Finished)) +
+      ggtitle('Χ”ΧªΧ¤ΧΧ’Χ•Χª Χ”ΧΆΧ¨Χ›Χ•Χª - ΧΧ™ΧΧ•ΧΧ™Χ ΧΧΆΧ•ΧΧª Χ΅Χ“Χ™Χ¨') + 
+      ylab('ΧΧ΅Χ¤Χ¨ Χ—Χ™Χ™ΧΧ™Χ') + 
+      xlab('Miluim score')# + 
     #ggtech::theme_tech(theme = 'etsy')+ ggtech::scale_fill_tech(theme="etsy")
-  
-  p2 = ggplot(scores, aes(x=SadirScores)) + #,fill = Finished)) +
-    geom_histogram(alpha=0.8, bins = 7) + #,aes(fill = Finished)) +
-    ylab('% of soldiers') + 
-    xlab('Sadir score') #+ 
-#    ggtech::theme_tech(theme = 'etsy')+ ggtech::scale_fill_tech(theme="etsy")
-  
-  gridExtra::grid.arrange(p1,p2)
-  
+    
+    p2 = ggplot(scores, aes(x=SadirScores)) + #,fill = Finished)) +
+      geom_histogram(alpha=0.8, bins = 7) + #,aes(fill = Finished)) +
+      ylab('% of soldiers') + 
+      xlab('Sadir score') #+ 
+    #    ggtech::theme_tech(theme = 'etsy')+ ggtech::scale_fill_tech(theme="etsy")
+    
+    gridExtra::grid.arrange(p1,p2)
+    
   }
 }
 
 plotConnectionBetweenTraitsAndMetric <- function(correlation_results,title = ""){
   correlations <- data.frame(trait = sapply(names(correlation_results),translate), val = correlation_results)
   ggplot(data = correlations,aes(x = trait,y = val,fill = trait)) + geom_col() + 
-    xlab('ϊλεπδ') + ylab('ξϊΰν ρτιψξο') + 
-  ggtitle(title) + 
+    xlab('ΧªΧ›Χ•Χ Χ”') + ylab('ΧΧªΧΧ Χ΅Χ¤Χ™Χ¨ΧΧ') + 
+    ggtitle(title) + 
     ggtech::theme_tech(theme = 'airbnb')+ theme(axis.text.x = element_text(angle = 90, hjust = 1),legend.position="none")
 }

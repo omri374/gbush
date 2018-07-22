@@ -3,31 +3,58 @@ library(ggplot2)
 library(reshape2)
 library(gridExtra)
 library(readxl)
+library(prettyunits)
+library(progress)
 
-source("R/utils.R", encoding = 'WINDOWS-1255')
-source("R/one_megabesh_stats.R", encoding = 'WINDOWS-1255')
-source("R/statistical_tests.R", encoding = 'WINDOWS-1255')
+source(file.path("R","utils.R"))#, encoding = 'WINDOWS-1255')
+#source("R/one_megabesh_stats.R", encoding = 'WINDOWS-1255')
+source(file.path("R","statistical_tests.R"))#, encoding = 'WINDOWS-1255')
 
 server <- function(input, output) {
-  getXls <- reactive({
-    xls1 <- readExcel('data/data-excel.xlsx')
-    xls2 <- readExcel('data/2018.xlsx')
-    xls <- bind_rows(xls1, xls2)
-    #xls <- xls1
+  getDefaultXls <- reactive({
+    if(!file.exists('data/data-excel.xlsx')) return(NULL)
+    xls <- readExcel('data/data-excel.xlsx')
     cat('length of input data = ', nrow(xls))
     xls <- xls %>% distinct()
     xls
   })
   
+  getXls <- reactive({
+    inFile <- input$file
+    
+    if(is.null(inFile))
+      return(NULL)
+    file.rename(inFile$datapath,
+                paste(inFile$datapath, ".xlsx", sep=""))
+    xls <- read_excel(paste(inFile$datapath, ".xlsx", sep=""), 1)
+    xls <- xls %>% distinct()
+    xls
+  })
+  
+  
+  
   getRaw <- reactive({
     xls <- getXls()
+    
+    #xls2 <- getDefaultXls()
+    xls2 <- NULL
+    if(is.null(xls)) xls <- xls2
+    
+    if(is.null(xls)) return(NULL)
+    
     raw <-
       parseRawData(xls, exclude_medical = input$exclude_medical)
     raw
   })
   getMegabeshRaw <- reactive({
     if(is.null(input$megabesh)) return(NULL)
-    getRaw() %>% filter(megabesh == input$megabesh)
+    
+    raw <- getRaw()
+    if(input$megabesh != 'ALL'){
+      raw <- raw %>% filter(megabesh == input$megabesh)
+    }
+    
+    raw
   })
   
   getPerSoldier <- reactive({
@@ -65,7 +92,7 @@ server <- function(input, output) {
     return(to_return)
   })
   
-
+  
   
   getMegabeshPerSoldierFiltered <- reactive({
     perSoldier <- getPerSoldierForMegabesh()
@@ -99,7 +126,7 @@ server <- function(input, output) {
     }
     if(nrow(df %>% filter(!Liba))>0) {
       
-    nonlibaSize <- df %>% filter(!Liba) %>% select(number_of_soldiers_in_tsevet) %>% unlist()
+      nonlibaSize <- df %>% filter(!Liba) %>% select(number_of_soldiers_in_tsevet) %>% unlist()
     } else{
       return(TRUE)
     }
@@ -136,7 +163,7 @@ server <- function(input, output) {
   })
   
   output$megabesh <- renderUI({
-    selectInput("megabesh", "Miluimnik", choices = unique(getRaw()$megabesh))
+    selectInput("megabesh", "Miluimnik", choices = c("ALL",unique(getRaw()$megabesh)))
   })
   
   
@@ -164,28 +191,79 @@ server <- function(input, output) {
     started <- megabeshPerSoldier %>% filter(StartedMaslul) %>% nrow()
     didNotStart <- megabeshPerSoldier %>% filter(!StartedMaslul) %>% nrow()
     
-paste("Number of evaluated soldiers:",total,"
+    paste("Number of evaluated soldiers:",total,"
           \nFinished maslul:",finished,"
           \nDidn't finish maslul:",didNotFinish,"
           \nStart maslul:",started,"
           \nDid not start:",didNotStart)
   })
   
-  output$hitMiss <- renderTable({
+  output$hitMiss <- renderPrint({
     megabeshPerSoldier <- getMegabeshPerSoldierFiltered()
-    scores <- getScores(megabeshPerSoldier)
+    if(is.null(megabeshPerSoldier)){ return(invisible())}
+    scoresMaarih <- getScores(megabeshPerSoldier)
     #hitmiss <- hitMissStats(scores,threshold = input$threshold)
-    hitMissConfusionMatrix(scoresDF = scores,threshold = input$threshold)
+    hitmissMegabesh <- hitMissConfusionMatrix(scoresDF = scoresMaarih,threshold = input$threshold)
+    print(hitmissMegabesh)
+    
+    #perSoldier <- getPerSoldierFiltered()
+    #scores <- getScores(perSoldier)
+    #hitmissAll <- as.data.frame(hitMissConfusionMatrix(scoresDF = scores,threshold = input$threshold))
+    #hitmissAll$Freq <- hitmissAll$Freq/sum(hitmissAll$Freq)
+    #all <- inner_join(hitmissMegabesh,hitmissAll,by=c("FinishedMaslul","PassedGibush"))
+    #names(all) <- c("Finished Maslul","Above threshold","This megabesh","All")
+    #all
     
     
-    })
+    
+  })
+  
+  getHitMissText <- function(hitmiss){
+    paste0("Hit/Miss = ",format(hitmiss$hitVsMiss,digits = 3,scientific = F),"<BR>= (", hitmiss$tp ," + ",hitmiss$tn ,")/(",hitmiss$fp," + ",hitmiss$fn,")
+          <BR>Accept precision = ",format(hitmiss$precision,digits = 3,scientific = F),"<BR>= ",hitmiss$tp ,"/(",hitmiss$tp," + ",hitmiss$fp,")
+          <BR>Reject precision = ",format(hitmiss$precisionNot,digits = 3,scientific = F),"<BR>= ",hitmiss$tn ,"/(",hitmiss$tn," + ",hitmiss$fn,")")
+  }
+  
+  output$hitMissSummary <- renderUI({
+    megabeshPerSoldier <- getMegabeshPerSoldierFiltered()
+    if(is.null(megabeshPerSoldier)){ return(invisible())}
+    scoresMegabesh <- getScores(megabeshPerSoldier)
+    hitmissMegabesh <- hitMissStats(scoresMegabesh,threshold = input$threshold)
+    
+    perSoldier <- getPerSoldierFiltered()
+    scores <- getScores(perSoldier)
+    hitmissAll <- hitMissStats(scores,threshold = input$threshold)
+    
+    rawOthers <- getRaw() %>% filter(megabesh != input$megabesh)
+    perSoldierOthers <- getDataPerSoldier(rawOthers) %>% semi_join(megabeshPerSoldier,by='Code')
+    
+    scoresDFOthers <- getScores(perSoldierOthers)
+    hitmissOthers <- hitMissStats(scoresDFOthers,threshold = input$threshold)
+    
+    
+    HTML(paste("<B>This megabesh:</B><p>",getHitMissText(hitmissMegabesh),"</p><B>Entire gibush:</B><p>",getHitMissText(hitmissAll),"</p><B>Megabshism evaluating the same soldiers as me:</B><p>",getHitMissText(hitmissOthers),"</p>"))
+    
+    
+  })
   
   output$hitMissPlot <- renderPlot({
     megabeshPerSoldier <- getMegabeshPerSoldierFiltered()
     if(is.null(megabeshPerSoldier)) return(NULL)
     scores <- getScores(megabeshPerSoldier)
     #hitmiss <- hitMissStats(scores,threshold = input$threshold)
-    hitMissConfusionMatrix(scoresDF = scores,threshold = input$threshold)
+    confusionMatrix <- hitMissConfusionMatrix(scoresDF = scores,threshold = input$threshold,estimator = 'MaarihScores')
+    plot(confusionMatrix,xlab = 'Maarih',ylab = 'Actual')
+    
+  })
+  
+  
+  output$hitMissPlotAll <- renderPlot({
+    perSoldier <- getPerSoldierFiltered()
+    if(is.null(perSoldier)) return(NULL)
+    scores <- getScores(perSoldier)
+    #hitmiss <- hitMissStats(scores,threshold = input$threshold)
+    confusionMatrix <- hitMissConfusionMatrix(scoresDF = scores,threshold = input$threshold,estimator = 'AvgScore')
+    plot(confusionMatrix,xlab = 'Maarih',ylab = 'Actual')
     
   })
   
@@ -219,6 +297,25 @@ paste("Number of evaluated soldiers:",total,"
     
   })
   
+  output$traitPlotFull <- renderPlot({
+    megabeshPerSoldier <- getMegabeshPerSoldierFiltered()
+    scoresDF <- getScores(megabeshPerSoldier)
+    
+    scores <- scoresDF %>% select(FinishedFactor,PressureSkills,PhysicalSkills,MotivationSkills,CognitiveSkills,CommanderSkills,TeamSkills,UnitSuitability)
+    
+    
+    scores$Finished <- ifelse(as.character(scores$FinishedFactor),"Finished maslul","Did not finish maslul")
+    scores$FinishedFactor <- NULL
+    melted <- melt(scores)
+    
+    p = ggplot(melted,aes(x = value,fill = variable)) +
+      geom_histogram(alpha=0.8, bins = 7) +
+      facet_grid(variable ~ .)
+    ylab('Number of soldiers')
+    
+    p
+  })
+  
   output$traitPlotComparison <- renderPlot({
     library(ggplot2)
     
@@ -232,10 +329,10 @@ paste("Number of evaluated soldiers:",total,"
     
     scores$Finished <- ifelse(as.character(scores$Finished),"Finished maslul","Did not finish maslul")
     megabeshPlot = ggplot(scores, aes(x=param)) +
-        geom_histogram(alpha=0.8, bins = 7) +
-        ggtitle(paste("Distribution for :",param_name)) + 
-        ylab('Number of soldiers') + 
-        xlab(param_name)
+      geom_histogram(alpha=0.8, bins = 7) +
+      ggtitle(paste("This megabesh, distribution for :",param_name)) + 
+      ylab('Number of soldiers') + 
+      xlab(param_name)
     
     
     rawOthers <- getRaw() %>% filter(megabesh != input$megabesh)
@@ -247,38 +344,66 @@ paste("Number of evaluated soldiers:",total,"
     scoresOthers$Finished <- ifelse(as.character(scoresOthers$Finished),"Finished maslul","Did not finish maslul")
     othersPlot = ggplot(scoresOthers, aes(x=param)) +
       geom_histogram(alpha=0.8, bins = 7) +
-      ggtitle(paste("Distribution for :",param_name)) + 
+      ggtitle(paste("Same soldiers megabshim, distribution for :",param_name)) + 
       ylab('Number of soldiers') + 
-      xlab(param_name) 
+      xlab(param_name)
     
-    return(gridExtra::grid.arrange(megabeshPlot,othersPlot))
+    perSoldierAll <- getDataPerSoldier(rawOthers)
+    
+    scoresDFAll <- getScores(perSoldierAll)
+    scoresAll <- scoresDFAll %>% select(param_name,FinishedFactor) %>% rename_(param = param_name, Finished = 'FinishedFactor')
+    
+    scoresAll$Finished <- ifelse(as.character(scoresAll$Finished),"Finished maslul","Did not finish maslul")
+    allPlot = ggplot(scoresAll, aes(x=param)) +
+      geom_histogram(alpha=0.8, bins = 7) +
+      ggtitle(paste("All megabshim distribution for :",param_name)) + 
+      ylab('Number of soldiers') + 
+      xlab(param_name)
+    
+    return(gridExtra::grid.arrange(megabeshPlot,othersPlot,allPlot))
   })
   
   output$correlationToUnitSuitability <- renderPlot({
     
     param_name <- input$trait
     megabeshPerSoldier <- getMegabeshPerSoldierFiltered()
+    perSoldier <- getPerSoldier()
     if(is.null(megabeshPerSoldier)) return(NULL)
-    scoresDF <- getScores(megabeshPerSoldier)
-    
+    scoresDFMegabesh <- getScores(megabeshPerSoldier)
+    scoresDFAll <- getScores(perSoldier)
     if(!input$sliceByFinished){
-    
-    unitSuitabilityCorrelation <- connectionBetweenTraitAndUnitSuitability(scoresDF)
-    correlations <- data.frame(trait = names(unitSuitabilityCorrelation), val = unitSuitabilityCorrelation)
-    g <- ggplot(data = correlations,aes(x = trait,y = val,fill = trait)) + geom_col() + 
-      xlab('Trait') + ylab("Spearman") + 
-      ggtitle(paste("Spearman correlation between Unit Suitability and",input$trait)) + theme(axis.text.x = element_text(angle = 90, hjust = 1),legend.position="none")
-    
-    return(g)
+      
+      unitSuitabilityCorrelationMegabesh <- connectionBetweenTraitAndUnitSuitability(scoresDFMegabesh)
+      correlationMegabesh <- data.frame(trait = names(unitSuitabilityCorrelationMegabesh),
+                                        val = unitSuitabilityCorrelationMegabesh,
+                                        population = input$megabesh)
+      
+      
+      unitSuitabilityCorrelationALL <- connectionBetweenTraitAndUnitSuitability(scoresDFAll)
+      correlationAll <- data.frame(trait = names(unitSuitabilityCorrelationALL),
+                                   val = unitSuitabilityCorrelationALL,
+                                   population = 'All')
+      
+      correlations <- bind_rows(correlationMegabesh,correlationAll)
+      
+      #correlations <- data.frame(trait = names(unitSuitabilityCorrelation), val = unitSuitabilityCorrelation)
+      g <- ggplot(data = correlations,aes(x = trait,y = val,fill = trait)) + geom_col() + 
+        xlab('Trait') + ylab("Spearman") + 
+        facet_grid(.~population) +
+        ggtitle(paste("Spearman correlation between Unit Suitability and other traits")) + 
+        theme(axis.text.x = element_text(angle = 90, hjust = 1),legend.position="none")
+      
+      return(g)
     } else{
-      finisherScores <- scoresDF %>% filter(FinishedFactor ==TRUE)
-      nonFinisherScores <- scoresDF %>% filter(FinishedFactor == FALSE)
+      finisherScores <- scoresDFMegabesh %>% filter(FinishedFactor ==TRUE)
+      nonFinisherScores <- scoresDFMegabesh %>% filter(FinishedFactor == FALSE)
       
       unitSuitabilityCorrelationFinished <- connectionBetweenTraitAndUnitSuitability(finisherScores)
       finishedCorrelations <- data.frame(trait = names(unitSuitabilityCorrelationFinished), val = unitSuitabilityCorrelationFinished)
       g1 <- ggplot(data = finishedCorrelations,aes(x = trait,y = val,fill = trait)) + geom_col() + 
         xlab('Trait') + ylab("Spearman") + 
-        ggtitle(paste("Spearman correlation between Unit Suitability and",input$trait,"for finishers")) + theme(axis.text.x = element_text(angle = 90, hjust = 1),legend.position="none")
+        ggtitle(paste("Spearman correlation between Unit Suitability and other traits for finishers")) + 
+        theme(axis.text.x = element_text(angle = 90, hjust = 1),legend.position="none")
       
       unitSuitabilityCorrelationNotFinished <- connectionBetweenTraitAndUnitSuitability(nonFinisherScores)
       notFinishedCorrelations <- data.frame(trait = names(unitSuitabilityCorrelationNotFinished), val = unitSuitabilityCorrelationNotFinished)
@@ -291,6 +416,55 @@ paste("Number of evaluated soldiers:",total,"
       
     }
   })
+  output$report <- downloadHandler(
+    # For PDF output, change this to "report.pdf"
+    filename = "report.html",
+    content = function(file) {
+      # Copy the report file to a temporary directory before processing it, in
+      # case we don't have write permissions to the current working dir (which
+      # can happen when deployed).
+      temp_dir <- tempdir()
+      
+      r_dir <- dir.create(file.path(temp_dir,"R"))
+      data_dir <- dir.create(file.path(temp_dir,"data"))
+      
+      tempReport <- file.path(temp_dir, "megabesh_report.Rmd")
+      file.copy("megabesh_report.Rmd", tempReport, overwrite = TRUE)
+      
+      tempUtils <- file.path(temp_dir,"R","utils.R")
+      file.copy(file.path("R","utils.R"), tempUtils, overwrite = TRUE)
+      
+      temp_statistical_tests <- file.path(temp_dir, "R","statistical_tests.R")
+      file.copy(file.path("R","statistical_tests.R"), temp_statistical_tests, overwrite = TRUE)
+      
+      input_file <- input$file
+      if(is.null(input$file)){
+        stop("No input file found")
+      }
+      
+      file.copy(paste0(input_file$datapath,".xlsx"), file.path(temp_dir,"data","0.xlsx"), overwrite = TRUE)
+      
+      
+      # Set up parameters to pass to Rmd document
+      params <- list(  
+        exclude_medical= input$exclude_medical,
+        liba_filter= input$liba_filter,
+        megabesh= input$megabesh,
+        month_filter= input$month_filter,
+        threshold= input$threshold,
+        filepath = file.path(temp_dir,"data","0.xlsx")
+      )
+      
+      # Knit the document, passing in the `params` list, and eval it in a
+      # child of the global environment (this isolates the code in the document
+      # from the code in this app).
+      rmarkdown::render(tempReport, output_file = file,
+                        params = params,
+                        envir = new.env(parent = globalenv())
+      )
+    }
+  )
+  
 }
 
 #shinyApp(ui = ui, server = server)

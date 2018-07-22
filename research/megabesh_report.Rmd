@@ -1,0 +1,415 @@
+---
+title: "Single estimator assessment"
+output: html_document
+params:
+  exclude_medical: FALSE
+  liba_filter: No
+  megabesh: Amos Eyal
+  month_filter: No
+  threshold: 4
+  filepath: data.xlsx
+---
+
+```{r setup, include=FALSE,warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(gridExtra)
+library(readxl)
+library(pander)
+source(file.path("R","utils.R"))#, encoding = 'WINDOWS-1255')
+#source("R/one_megabesh_stats.R")#, encoding = 'WINDOWS-1255')
+source(file.path("R","statistical_tests.R"))#, encoding = 'WINDOWS-1255')
+
+getXls <- function(){
+  xls <- readExcel(params$filepath)
+  xls <- xls %>% distinct()
+  xls
+}
+
+getRaw <- function(){
+  xls <- getXls()
+  raw <-
+    parseRawData(xls, exclude_medical = params$exclude_medical)
+  raw
+}
+
+getMegabeshRaw <- function(){
+  if(is.null(params$megabesh)) return(NULL)
+  getRaw() %>% filter(megabesh == params$megabesh)
+}
+
+getPerSoldier <- function(){
+  raw <- getRaw()
+  if(is.null(raw)) return(NULL)
+  getDataPerSoldier(raw)
+}
+
+getPerSoldierForMegabesh <- function(){
+  megabeshRaw <- getMegabeshRaw()
+  if(is.null(megabeshRaw)) return(NULL)
+  getDataPerSoldier(megabeshRaw)
+}
+
+getPerSoldierFiltered <- function(){
+  perSoldier <- getPerSoldier()
+  
+  if(is.null(perSoldier)) return(NULL)
+  to_return <- perSoldier
+  
+  if(params$liba_filter == "Liba"){
+    to_return <- perSoldier %>% filter(Liba)
+  } else if(params$liba_filter == "NonLiba"){
+    to_return <- perSoldier %>% filter(!Liba)
+  }
+  
+  if(params$month_filter=="Aug"){
+    to_return <- to_return %>% filter(GibushMonth == "Aug")
+  } else if(params$month_filter=="Nov"){
+    to_return <- to_return %>% filter(GibushMonth == "Nov")
+  }  else if(params$month_filter=="Mar"){
+    to_return <- to_return %>% filter(GibushMonth == "Mar")
+  }
+  
+  return(to_return)
+}
+
+
+
+getMegabeshPerSoldierFiltered <- function(){
+  perSoldier <- getPerSoldierForMegabesh()
+  if(is.null(perSoldier)) return(NULL)
+  
+  to_return <- perSoldier
+  
+  if(is.null(perSoldier)) return(NULL)
+  if(params$liba_filter == "Liba"){
+    to_return <- perSoldier %>% filter(Liba)
+  } else if(params$liba_filter == "NonLiba"){
+    to_return <- perSoldier %>% filter(!Liba)
+  }
+  
+  if(params$month_filter=="Aug"){
+    to_return <- to_return %>% filter(GibushMonth == "Aug")
+  } else if(params$month_filter=="Nov"){
+    to_return <- to_return %>% filter(GibushMonth == "Nov")
+  }  else if(params$month_filter=="Mar"){
+    to_return <- to_return %>% filter(GibushMonth == "Mar")
+  }
+  
+  return(to_return)
+}
+
+is_majority_liba <- function(df){
+  if(nrow(df %>% filter(Liba))>0) {
+    libaSize <- df %>% filter(Liba) %>% select(number_of_soldiers_in_tsevet) %>% unlist()
+  } else{
+    return(FALSE)
+  }
+  if(nrow(df %>% filter(!Liba))>0) {
+    
+    nonlibaSize <- df %>% filter(!Liba) %>% select(number_of_soldiers_in_tsevet) %>% unlist()
+  } else{
+    return(TRUE)
+  }
+  return (libaSize > nonlibaSize)
+  
+}
+
+getMegabeshGibushim <- function(){
+  megabeshRaw <- getMegabeshRaw()
+  if(is.null(megabeshRaw)) return(NULL)
+  megabeshRaw$Liba <- ifelse(as.numeric(as.character(megabeshRaw$Mitam))>1,T,F)
+  teams <- megabeshRaw %>% group_by(Date,Tsevet,Liba) %>% summarize(number_of_soldiers_in_tsevet = n())
+  unique_dates <- unique(teams$Date)
+  cleanTeams <- data.frame()
+  for (unique_date in unique_dates){
+    this_gibush <- teams %>% ungroup() %>% filter(Date==unique_date)
+    liba <- is_majority_liba(this_gibush)
+    num_soldiers <- sum(this_gibush$number_of_soldiers_in_tsevet)
+    cleanTeams <- bind_rows(cleanTeams,data.frame(Date = unique_date,Liba = liba,number_of_soldiers_in_tsevet = num_soldiers))
+  }
+  cleanTeams
+}
+
+```
+
+```{r, echo=F}
+#pander(paste("Statistics for",params$megabesh))
+```
+
+
+```{R, echo=F,warning=FALSE,message=FALSE,error=FALSE}
+
+#parameters = data.frame(Megabesh = params$megabesh,
+#                        exclude_medical = params$exclude_medical,
+#                        Filter_by_liba = params$liba_filter,
+#                        Filter_by_month = params$month_filter)
+
+pander(paste("<p><B>Name:</B>",params$megabesh,"</p>
+<p><B>Exclude those with medical reaspons?:</B>",params$exclude_medical,"</p>
+<p><B>Specific liba/not liba filter?:</B>",params$liba_filter,"</p>
+<p><B>Specific month fliter?:</B>",params$month_filter,"</p>"))
+
+```
+
+## נתוני גיבוש
+
+
+```{R, echo=F,warning=FALSE}
+teams <- getMegabeshGibushim()
+
+if(is.null(teams)) return(NULL)
+liba <- teams %>% filter(Liba)
+nonliba <- teams %>% filter(!Liba)
+pander(paste("Number of gibushim :",nrow(teams),"<BR>
+Number of Liba teams :",nrow(liba),"<BR>
+Number of non-Liba teams :",nrow(nonliba)))
+```
+
+## נתוני חיילים
+
+```{R, echo=F,warning=FALSE}
+megabeshPerSoldier <- getMegabeshPerSoldierFiltered()
+if(is.null(megabeshPerSoldier)) return(NULL)
+total <- nrow(megabeshPerSoldier)
+finished <- megabeshPerSoldier %>% filter(FinishedMaslul) %>% nrow()
+didNotFinish <- megabeshPerSoldier %>% filter(!FinishedMaslul) %>% nrow()
+started <- megabeshPerSoldier %>% filter(StartedMaslul) %>% nrow()
+didNotStart <- megabeshPerSoldier %>% filter(!StartedMaslul) %>% nrow()
+
+pander(paste("Number of evaluated soldiers:",total,"<BR>
+          Finished maslul:",finished,"<BR>
+          Didn't finish maslul:",didNotFinish,"<BR>
+          Start maslul:",started,"<BR>
+          Did not start:",didNotStart))
+```
+
+## דיוק Hit/Miss
+
+```{R, echo=F,warning=FALSE,message=FALSE,error=FALSE}
+
+megabeshPerSoldier <- getMegabeshPerSoldierFiltered()
+scoresMaarih <- getScores(megabeshPerSoldier)
+#hitmiss <- hitMissStats(scores,threshold = params$threshold)
+hitmissMegabesh <- hitMissConfusionMatrix(scoresDF = scoresMaarih,threshold = params$threshold)
+if(nrow(hitmissMegabesh) > 0) pander(hitmissMegabesh)
+
+```
+
+```{R, echo=F,warning=FALSE}
+
+getHitMissText <- function(hitmiss){
+  paste0("<b>Hit/Miss = ",format(hitmiss$hitVsMiss,digits = 3,scientific = F),"</b><BR>= (", hitmiss$tp ," + ",hitmiss$tn ,")/(",hitmiss$fp," + ",hitmiss$fn,")
+          <BR><BR><b>Accept precision = ",format(hitmiss$precision,digits = 3,scientific = F),"</b><BR>= ",hitmiss$tp ,"/(",hitmiss$tp," + ",hitmiss$fp,")
+          <BR><BR><b>Reject precision = ",format(hitmiss$precisionNot,digits = 3,scientific = F),"</b><BR>= ",hitmiss$tn ,"/(",hitmiss$tn," + ",hitmiss$fn,")")
+}
+```
+
+```{R, echo=F,warning=FALSE,message=FALSE,error=FALSE}
+
+megabeshPerSoldier <- getMegabeshPerSoldierFiltered()
+
+scoresMegabesh <- getScores(megabeshPerSoldier)
+hitmissMegabesh <- hitMissStats(scoresMegabesh,threshold = params$threshold)
+
+perSoldier <- getPerSoldierFiltered()
+scores <- getScores(perSoldier)
+hitmissAll <- hitMissStats(scores,threshold = params$threshold)
+
+rawOthers <- getRaw() %>% filter(megabesh != params$megabesh)
+perSoldierOthers <- getDataPerSoldier(rawOthers) %>% semi_join(megabeshPerSoldier,by='Code')
+
+scoresDFOthers <- getScores(perSoldierOthers)
+hitmissOthers <- hitMissStats(scoresDFOthers,threshold = params$threshold)
+
+
+pander(paste("<B>This megabesh:</B><p>This megabesh:",getHitMissText(hitmissMegabesh),"</p>
+             <p><B>Entire gibush:</B></p>",getHitMissText(hitmissAll),"</p><p><B>Megabshism evaluating the same soldiers as me:</B></p>",getHitMissText(hitmissOthers),"</p>"))
+
+```
+
+## התפלגות ציון לפי תכונה
+
+```{R, echo=F,warning=FALSE,message=FALSE,error=FALSE}
+
+library(reshape2)
+megabeshPerSoldier <- getMegabeshPerSoldierFiltered()
+scoresDF <- getScores(megabeshPerSoldier)
+
+scores <- scoresDF %>% select(FinishedFactor,
+                              PressureSkills,
+                              PhysicalSkills,
+                              MotivationSkills,
+                              CognitiveSkills,
+                              CommanderSkills,
+                              TeamSkills,
+                              UnitSuitability)
+
+scores$Finished <- ifelse(as.character(scores$FinishedFactor),"Finished maslul","Did not finish maslul")
+scores$FinishedFactor <- NULL
+melted <- melt(scores)
+
+ggplot(melted,aes(x = value,fill = variable)) +
+  geom_histogram(alpha=0.8, bins = 7) +
+  facet_grid(variable ~ .) + 
+  ylab('Number of soldiers')
+
+```
+
+## התפלגות ציון לפי תכונה בהשוואה למעריכים אחרים שהעריכו את אותם החיילים ולכלל המעריכים
+
+```{R, echo=F,warning=FALSE,message=FALSE,error=FALSE}
+library(ggplot2)
+traits_comparison <- function(trait){
+  megabeshPerSoldier <- getMegabeshPerSoldierFiltered()
+  if(is.null(megabeshPerSoldier)) return(NULL)
+  scoresDF <- getScores(megabeshPerSoldier)
+  
+  
+  scores <- scoresDF %>% select(trait,FinishedFactor) %>% rename_(param = trait, Finished = 'FinishedFactor')
+  
+  scores$Finished <- ifelse(as.character(scores$Finished),"Finished maslul","Did not finish maslul")
+  megabeshPlot = ggplot(scores, aes(x=param)) +
+    geom_histogram(alpha=0.8, bins = 7) +
+    ggtitle("This megabesh") + 
+    ylab('Number of soldiers') + 
+    xlab(trait)
+  
+  
+  rawOthers <- getRaw() %>% filter(megabesh != params$megabesh)
+  perSoldierOthers <- getDataPerSoldier(rawOthers) %>% semi_join(megabeshPerSoldier,by='Code')
+  
+  scoresDFOthers <- getScores(perSoldierOthers)
+  scoresOthers <- scoresDFOthers %>% select(trait,FinishedFactor) %>% rename_(param = trait, Finished = 'FinishedFactor')
+  
+  scoresOthers$Finished <- ifelse(as.character(scoresOthers$Finished),"Finished maslul","Did not finish maslul")
+  othersPlot = ggplot(scoresOthers, aes(x=param)) +
+    geom_histogram(alpha=0.8, bins = 7) +
+    ggtitle("Same soldiers megabshim") + 
+    ylab('Number of soldiers') + 
+    xlab(trait)
+  
+  perSoldierAll <- getDataPerSoldier(rawOthers)
+  
+  scoresDFAll <- getScores(perSoldierAll)
+  scoresAll <- scoresDFAll %>% select(trait,FinishedFactor) %>% rename_(param = trait, Finished = 'FinishedFactor')
+  
+  scoresAll$Finished <- ifelse(as.character(scoresAll$Finished),"Finished maslul","Did not finish maslul")
+  allPlot = ggplot(scoresAll, aes(x=param)) +
+    geom_histogram(alpha=0.8, bins = 7) +
+    ggtitle("All megabshim") + 
+    ylab('Number of soldiers') + 
+    xlab(trait)
+  
+  return(gridExtra::grid.arrange(megabeshPlot,othersPlot,allPlot))
+  
+}
+```
+
+### התאמה ליחידה
+
+```{R, echo=F,warning=FALSE}
+traits_comparison('UnitSuitability')
+```
+
+### יכולת פיקוד
+
+```{R, echo=F,warning=FALSE}
+traits_comparison('CommanderSkills')
+```
+
+### עבודת צוות
+
+```{R, echo=F,warning=FALSE}
+traits_comparison('TeamSkills')
+```
+
+### יכולת פיזית
+
+```{R, echo=F,warning=FALSE}
+traits_comparison('PhysicalSkills')
+```
+
+### עמידה בתנאי לחץ
+
+```{R, echo=F,warning=FALSE}
+traits_comparison('PressureSkills')
+```
+
+### מוטיבציה
+
+```{R, echo=F,warning=FALSE}
+traits_comparison('MotivationSkills')
+```
+
+### יכולת קוגניטיבית
+
+```{R, echo=F,warning=FALSE}
+traits_comparison('CognitiveSkills')
+```
+
+## מתאם בין ציוני תכונה לבין ציוני התאמה ליחידה, מעריך בודד וכלל המעריכים
+
+```{R, echo=F,warning=FALSE}
+traits_corr <- function(sliceByFinished = F){
+  scoresDFMegabesh <- getScores(megabeshPerSoldier)
+  scoresDFAll <- getScores(perSoldier)
+  if(!sliceByFinished){
+    
+    unitSuitabilityCorrelationMegabesh <- connectionBetweenTraitAndUnitSuitability(scoresDFMegabesh)
+    correlationMegabesh <- data.frame(trait = names(unitSuitabilityCorrelationMegabesh),
+                                      val = unitSuitabilityCorrelationMegabesh,
+                                      population = params$megabesh)
+    
+    
+    unitSuitabilityCorrelationALL <- connectionBetweenTraitAndUnitSuitability(scoresDFAll)
+    correlationAll <- data.frame(trait = names(unitSuitabilityCorrelationALL),
+                                 val = unitSuitabilityCorrelationALL,
+                                 population = 'All')
+    
+    correlations <- bind_rows(correlationMegabesh,correlationAll)
+    
+    #correlations <- data.frame(trait = names(unitSuitabilityCorrelation), val = unitSuitabilityCorrelation)
+    g <- ggplot(data = correlations,aes(x = trait,y = val,fill = trait)) + geom_col() + 
+      xlab('Trait') + ylab("Spearman") + 
+      facet_grid(.~population) +
+      ggtitle(paste("Spearman correlation between Unit Suitability and other traits")) + 
+      theme(axis.text.x = element_text(angle = 90, hjust = 1),legend.position="none")
+    
+    return(g)
+    
+  } else{
+    finisherScores <- scoresDF %>% filter(FinishedFactor ==TRUE)
+    nonFinisherScores <- scoresDF %>% filter(FinishedFactor == FALSE)
+    
+    unitSuitabilityCorrelationFinished <- connectionBetweenTraitAndUnitSuitability(finisherScores)
+    finishedCorrelations <- data.frame(trait = names(unitSuitabilityCorrelationFinished), val = unitSuitabilityCorrelationFinished)
+    g1 <- ggplot(data = finishedCorrelations,aes(x = trait,y = val,fill = trait)) + geom_col() + 
+      xlab('Trait') + ylab("Spearman") + 
+      ggtitle(paste("Spearman correlation between Unit Suitability and other traits for finishers")) +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1),legend.position="none")
+    
+    unitSuitabilityCorrelationNotFinished <- connectionBetweenTraitAndUnitSuitability(nonFinisherScores)
+    notFinishedCorrelations <- data.frame(trait = names(unitSuitabilityCorrelationNotFinished), val = unitSuitabilityCorrelationNotFinished)
+    
+    
+    g2 <- ggplot(data = notFinishedCorrelations,aes(x = trait,y = val,fill = trait)) + geom_col() + 
+      xlab('Trait') + ylab("Spearman") + 
+      ggtitle(paste("Spearman correlation between Unit Suitability and other traits for non-finishers")) +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1),legend.position="none")
+    return(gridExtra::grid.arrange(g1,g2))
+    
+  }
+}
+
+traits_corr(F)
+```
+
+### מתאם בין תכונה להתאמה ליחידה, מסיימי מסלול לעומת לא מסיימי מסלול
+
+```{R, echo=F,warning=FALSE,message=FALSE,error=FALSE, fig.height = 10}
+traits_corr(T)
+```
+

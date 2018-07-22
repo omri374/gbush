@@ -1,6 +1,6 @@
 library(dplyr)
 library(ggplot2)
-#library(ggtech)
+library(GGally)
 
 ####--- Test the significance of traits vs. finished/not ---- ####
 connectionBetweenScoreAndFinish <- function(finishersScores,nonFinisherScores,header, testType = 'wilcox', printMe = F){
@@ -87,12 +87,12 @@ connectionBetweenTraitAndAvgScore <- function(datasetWithTraits){
 }
 
 plotConnectionBetweenTraitsAndMetric <- function(correlation_results,title = ""){
-  source('r/utils.R')
+  source(file.path("R","utils.R"))
   correlations <- data.frame(trait = names(correlation_results), val = correlation_results)
   ggplot(data = correlations,aes(x = trait,y = val,fill = trait)) + geom_col() + 
     xlab("תכונה") + ylab("מתאם") + 
-    ggtitle(title) + 
-    ggtech::theme_tech(theme = 'airbnb')+ theme(axis.text.x = element_text(angle = 90, hjust = 1),legend.position="none")
+    ggtitle(title) #+ 
+    #ggtech::theme_tech(theme = 'airbnb')+ theme(axis.text.x = element_text(angle = 90, hjust = 1),legend.position="none")
 }
 
 connectionBetweenTraitAndUnitSuitability <- function(datasetWithTraits){
@@ -111,13 +111,35 @@ connectionBetweenTraitAndUnitSuitability <- function(datasetWithTraits){
   
 }
 
+
 #####---- HIT/MISS analysis ----#####
 
-hitMissConfusionMatrix <- function(scoresDF, threshold= 4){
-  hitMissDF <- scoresDF %>% transmute(FinishedMaslul = FinishedFactor, PassedGibush = AvgScore > threshold)
+hitMissConfusionMatrix <- function(scoresDF, threshold= 4,estimator = 'MaarihScores'){
+  
+  if(estimator == 'AvgScore'){
+    scoresDF$Estimation = scoresDF$AvgScore
+  } else if(estimator == 'MaarihScores'){
+    scoresDF$Estimation = scoresDF$MaarihScores
+  } else if(estimator == 'FinalScore'){
+    scoresDF$Estimation = scoresDF$FinalScore
+  } else if(estimator == 'UnitSuitability'){
+    scoresDF$Estimation = scoresDF$UnitSuitability
+  } else if(estimator == 'MiluimScores'){
+    scoresDF$Estimation = scoresDF$MiluimScores
+  } else if(estimator == 'SadirScores'){
+    scoresDF$Estimation = scoresDF$SadirScores
+  } else if(estimator == 'Sociometric'){
+    scoresDF$Estimation = scoresDF$Sociometric
+  }
+  
+  #hitmiss <- hitMissStats(scoresDF,threshold = threshold,estimator = estimator)
+  #mat = matrix(data = c(c(hitmiss$tp,hitmiss$fn),c(hitmiss$fp,hitmiss$tn)),nrow = 2,ncol=2)
+  hitMissDF <- scoresDF %>% transmute(FinishedMaslul = FinishedFactor, PassedGibush = Estimation > threshold)
   confusionMatrix = table(hitMissDF)
-  plot(confusionMatrix)
-  print(confusionMatrix)
+  #colnames(confusionMatrix) <- c("Finished","DidNotFinish")
+  #rownames(confusionMatrix) <- c("AboveThreshold","BelowThreshold")
+  confusionMatrix
+  #print(confusionMatrix)
 }
 
 hitMissStats <- function(scoresDF, threshold = 4, estimator = 'MaarihScores'){
@@ -133,13 +155,15 @@ hitMissStats <- function(scoresDF, threshold = 4, estimator = 'MaarihScores'){
   } else if(estimator == 'MaarihScores'){
     scoresDF$Estimation = scoresDF$MaarihScores
   } else if(estimator == 'FinalScore'){
-    scoresDF$Estimation = (scoresDF$FinalScore/100) * 7
+    scoresDF$Estimation = scoresDF$FinalScore
+  } else if(estimator == 'UnitSuitability'){
+      scoresDF$Estimation = scoresDF$UnitSuitability
   } else if(estimator == 'MiluimScores'){
     scoresDF$Estimation = scoresDF$MiluimScores
   } else if(estimator == 'SadirScores'){
     scoresDF$Estimation = scoresDF$SadirScores
   } else if(estimator == 'Sociometric'){
-    scoresDF$Estimation = (scoresDF$Sociometric/100) * 7
+    scoresDF$Estimation = scoresDF$Sociometric
   }
   
   
@@ -149,7 +173,10 @@ hitMissStats <- function(scoresDF, threshold = 4, estimator = 'MaarihScores'){
       fp = sum(Estimation > threshold & FinishedFactor == F,na.rm =T ),
       tn = sum(Estimation <= threshold & FinishedFactor == F,na.rm = T),
       fn = sum(Estimation <= threshold & FinishedFactor == T,na.rm = T),
+      negatives = fn+tn,
+      posities = tp + fp,
       num = n(),
+      #num_started = sum(!is.na(FinishedFactor)),
       precision = tp/(tp+fp),
       precisionNot = tn/(tn+fn),
       normalizedPrecision = precision*prior + precisionNot*(1-prior),
@@ -165,10 +192,10 @@ hitMissStats <- function(scoresDF, threshold = 4, estimator = 'MaarihScores'){
 
 }
 
-hitmissAnalysis <- function(scoresDF, estimator = 'MaarihScores'){
+hitmissAnalysis <- function(scoresDF, estimator = 'MaarihScores',range = seq(1,7,0.5)){
   
   hitmiss <- data.frame()
-  for(i in seq(1,7,0.5)){
+  for(i in range){
     hitmiss <- bind_rows(hitmiss,hitMissStats(scoresDF,threshold = i,estimator = estimator))
   }
   
