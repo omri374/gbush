@@ -154,16 +154,25 @@ server <- function(input, output) {
     paste("Statistics for",input$megabesh)
   })
   
+  output$falsePositives <- DT::renderDataTable({
+    raw <- getMegabeshRaw()
+    if(is.null(raw)) return(NULL)
+    
+    raw %>% 
+      filter(UnitSuitability >= input$threshold & FinishedMaslul==FALSE) %>% 
+      select(Date,megabesh,Liba, Reason,LeavingReason,UnitSuitability, PhysicalSkills, TeamSkills,PressureSkills,MotivationSkills,CognitiveSkills,CommanderSkills)
+  },options = list(scrollX = TRUE))
+  
   output$raw_data <- DT::renderDataTable({
     getMegabeshRaw()
-  })
+  },options = list(scrollX = TRUE))
   
   output$gibushim <- DT::renderDataTable({
     getMegabeshGibushim()
   })
   
   output$megabesh <- renderUI({
-    selectInput("megabesh", "Miluimnik", choices = c("ALL",unique(getRaw()$megabesh)))
+    selectInput("megabesh", "Miluimnik", choices = c("ALL",sort(unique(getRaw()$megabesh))))
   })
   
   
@@ -202,8 +211,10 @@ server <- function(input, output) {
     megabeshPerSoldier <- getMegabeshPerSoldierFiltered()
     if(is.null(megabeshPerSoldier)){ return(invisible())}
     scoresMaarih <- getScores(megabeshPerSoldier)
-    #hitmiss <- hitMissStats(scores,threshold = input$threshold)
-    hitmissMegabesh <- hitMissConfusionMatrix(scoresDF = scoresMaarih,threshold = input$threshold)
+
+    hitmissMegabesh <- hitMissConfusionMatrix(scoresDF = scoresMaarih,
+                                              threshold = input$threshold,
+                                              estimator = 'UnitSuitability')
     print(hitmissMegabesh)
     
     #perSoldier <- getPerSoldierFiltered()
@@ -228,17 +239,23 @@ server <- function(input, output) {
     megabeshPerSoldier <- getMegabeshPerSoldierFiltered()
     if(is.null(megabeshPerSoldier)){ return(invisible())}
     scoresMegabesh <- getScores(megabeshPerSoldier)
-    hitmissMegabesh <- hitMissStats(scoresMegabesh,threshold = input$threshold)
+    hitmissMegabesh <- hitMissStats(scoresMegabesh,
+                                    threshold = input$threshold,
+                                    estimator = 'UnitSuitability')
     
     perSoldier <- getPerSoldierFiltered()
     scores <- getScores(perSoldier)
-    hitmissAll <- hitMissStats(scores,threshold = input$threshold)
+    hitmissAll <- hitMissStats(scores,
+                               threshold = input$threshold,
+                               estimator = 'UnitSuitability')
     
     rawOthers <- getRaw() %>% filter(megabesh != input$megabesh)
     perSoldierOthers <- getDataPerSoldier(rawOthers) %>% semi_join(megabeshPerSoldier,by='Code')
     
     scoresDFOthers <- getScores(perSoldierOthers)
-    hitmissOthers <- hitMissStats(scoresDFOthers,threshold = input$threshold)
+    hitmissOthers <- hitMissStats(scoresDFOthers,
+                                  threshold = input$threshold,
+                                  estimator = 'UnitSuitability')
     
     
     HTML(paste("<B>This megabesh:</B><p>",getHitMissText(hitmissMegabesh),"</p><B>Entire gibush:</B><p>",getHitMissText(hitmissAll),"</p><B>Megabshism evaluating the same soldiers as me:</B><p>",getHitMissText(hitmissOthers),"</p>"))
@@ -250,7 +267,7 @@ server <- function(input, output) {
     megabeshPerSoldier <- getMegabeshPerSoldierFiltered()
     if(is.null(megabeshPerSoldier)) return(NULL)
     scores <- getScores(megabeshPerSoldier)
-    #hitmiss <- hitMissStats(scores,threshold = input$threshold)
+
     confusionMatrix <- hitMissConfusionMatrix(scoresDF = scores,threshold = input$threshold,estimator = 'MaarihScores')
     plot(confusionMatrix,xlab = 'Maarih',ylab = 'Actual')
     
@@ -261,7 +278,7 @@ server <- function(input, output) {
     perSoldier <- getPerSoldierFiltered()
     if(is.null(perSoldier)) return(NULL)
     scores <- getScores(perSoldier)
-    #hitmiss <- hitMissStats(scores,threshold = input$threshold)
+
     confusionMatrix <- hitMissConfusionMatrix(scoresDF = scores,threshold = input$threshold,estimator = 'AvgScore')
     plot(confusionMatrix,xlab = 'Maarih',ylab = 'Actual')
     

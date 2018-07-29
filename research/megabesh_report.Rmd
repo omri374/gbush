@@ -4,7 +4,7 @@ output: html_document
 params:
   exclude_medical: FALSE
   liba_filter: No
-  megabesh: Amos Eyal
+  megabesh: Omri Mendels
   month_filter: No
   threshold: 4
   filepath: data.xlsx
@@ -187,18 +187,19 @@ pander(paste("Number of evaluated soldiers:",total,"<BR>
 ```
 
 ## דיוק Hit/Miss
+### לפי ציון התאמה ליחידה
 
 ```{R, echo=F,warning=FALSE,message=FALSE,error=FALSE}
 
 megabeshPerSoldier <- getMegabeshPerSoldierFiltered()
 scoresMaarih <- getScores(megabeshPerSoldier)
 #hitmiss <- hitMissStats(scores,threshold = params$threshold)
-hitmissMegabesh <- hitMissConfusionMatrix(scoresDF = scoresMaarih,threshold = params$threshold)
+hitmissMegabesh <- hitMissConfusionMatrix(scoresDF = scoresMaarih,threshold = params$threshold, estimator = 'UnitSuitability')
 if(nrow(hitmissMegabesh) > 0) pander(hitmissMegabesh)
 
 ```
 
-```{R, echo=F,warning=FALSE}
+```{R, echo=F,warning=FALSE,message=FALSE,error=FALSE}
 
 getHitMissText <- function(hitmiss){
   paste0("<b>Hit/Miss = ",format(hitmiss$hitVsMiss,digits = 3,scientific = F),"</b><BR>= (", hitmiss$tp ," + ",hitmiss$tn ,")/(",hitmiss$fp," + ",hitmiss$fn,")
@@ -207,28 +208,39 @@ getHitMissText <- function(hitmiss){
 }
 ```
 
-```{R, echo=F,warning=FALSE,message=FALSE,error=FALSE}
+```{R echo=FALSE, error=FALSE, message=FALSE, warning=FALSE}
 
 megabeshPerSoldier <- getMegabeshPerSoldierFiltered()
 
 scoresMegabesh <- getScores(megabeshPerSoldier)
-hitmissMegabesh <- hitMissStats(scoresMegabesh,threshold = params$threshold)
+hitmissMegabesh <- hitMissStats(scoresMegabesh,
+                                threshold = params$threshold,
+                                estimator = 'UnitSuitability')
 
 perSoldier <- getPerSoldierFiltered()
 scores <- getScores(perSoldier)
-hitmissAll <- hitMissStats(scores,threshold = params$threshold)
+hitmissAll <- hitMissStats(scores,
+                           threshold = params$threshold,
+                           estimator = 'UnitSuitability')
 
 rawOthers <- getRaw() %>% filter(megabesh != params$megabesh)
 perSoldierOthers <- getDataPerSoldier(rawOthers) %>% semi_join(megabeshPerSoldier,by='Code')
 
 scoresDFOthers <- getScores(perSoldierOthers)
-hitmissOthers <- hitMissStats(scoresDFOthers,threshold = params$threshold)
+hitmissOthers <- hitMissStats(scoresDFOthers,
+                              threshold = params$threshold,
+                              estimator = 'UnitSuitability')
 
 
-pander(paste("<B>This megabesh:</B><p>This megabesh:",getHitMissText(hitmissMegabesh),"</p>
-             <p><B>Entire gibush:</B></p>",getHitMissText(hitmissAll),"</p><p><B>Megabshism evaluating the same soldiers as me:</B></p>",getHitMissText(hitmissOthers),"</p>"))
-
+pander(paste("<B>This megabesh:</B><p>",getHitMissText(hitmissMegabesh),"</p>"))
 ```
+```{R echo=FALSE, error=FALSE, message=FALSE, warning=FALSE}
+pander(paste("<p><B>Entire gibush:</B></p>",getHitMissText(hitmissAll),"</p>"))
+```
+```{R echo=FALSE, error=FALSE, message=FALSE, warning=FALSE}
+pander(paste("<p><B>Megabshism evaluating the same soldiers as me:</B></p>",getHitMissText(hitmissOthers),"</p>"))
+```
+
 
 ## התפלגות ציון לפי תכונה
 
@@ -413,3 +425,19 @@ traits_corr(F)
 traits_corr(T)
 ```
 
+### נתוני חיילים שלא סיימו למרות שקיבלו ציון גבוה
+
+```{R, echo=F,warning=FALSE,message=FALSE,error=FALSE}
+raw <- getMegabeshRaw()
+
+fps <- raw %>% 
+  filter(UnitSuitability >= params$threshold & FinishedMaslul==FALSE) 
+if(nrow(fps)==0){
+  print("No records")
+} else{
+  fps <- fps %>% 
+    select(Date,megabesh,Liba, Reason,LeavingReason,UnitSuitability, PhysicalSkills, TeamSkills,PressureSkills,MotivationSkills,CognitiveSkills,CommanderSkills)
+  
+  knitr::kable(fps)
+}
+```

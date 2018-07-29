@@ -72,7 +72,7 @@ body <- dashboardBody(
     ),
     
     tabPanel("Gibushim",DT::dataTableOutput("gibushim")),
-    
+    tabPanel("False positives", DT::dataTableOutput("falsePositives")),
     tabPanel("Raw",
              
              DT::dataTableOutput("raw_data")

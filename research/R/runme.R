@@ -6,14 +6,14 @@ Sys.setlocale(category = "LC_ALL", locale = "Hebrew_Israel.1255")
 #library(caret)
 library(dplyr)
 library(ggplot2)
-
+library(readxl)
 source("R/utils.R")#, encoding = 'WINDOWS-1255')
 source("R/statistical_tests.R")#, encoding = 'WINDOWS-1255')
 
 
 ###--- create raw data ---###
 
-xls <- readExcel('data/data-excel.xlsx')
+xls <- readExcel('../data/data-excel-english-names.xlsx')
 cat('length of input data = ',nrow(xls))
 xls <- xls %>% distinct()
 cat('length of input data after removing duplications = ',nrow(xls))
@@ -131,9 +131,9 @@ plotHistogramByFinishersCustomFacet(scoresDF,param_name = 'AvgScore',postfix = '
 perMitamTest(finisherScores,nonFinisherScores)
 
 #Mitam 0 plot
-plotHistogramByFinishers(scoresDF %>% filter(as.numeric(as.character(Mitam))<2),param_name='AvgScore','μΰ μιαδ')
+plotHistogramByFinishers(scoresDF %>% filter(as.numeric(as.character(Mitam))<2),param_name='AvgScore','?? ????')
 #Mitam 1,2 plot
-plotHistogramByFinishers(scoresDF %>% filter(as.numeric(as.character(Mitam))>1),param_name='AvgScore', 'μιαδ')
+plotHistogramByFinishers(scoresDF %>% filter(as.numeric(as.character(Mitam))>1),param_name='AvgScore', '????')
 
 
 ## Miluim vs. Sadir:
@@ -190,8 +190,8 @@ plotConnectionBetweenTraitsAndMetric(avgScoreCorreation, 'ΧΧªΧΧ Χ‘Χ™Χ ΧªΧ›Χ•
 
 unitSuitabilityCorrelation_liba <- connectionBetweenTraitAndUnitSuitability(scoresDFWithMedical %>% filter(Liba))
 unitSuitabilityCorrelation_nonliba <- connectionBetweenTraitAndUnitSuitability(scoresDFWithMedical %>% filter(!Liba))
-spearman_liba <- plotConnectionBetweenTraitsAndMetric(unitSuitabilityCorrelation_liba, 'μιαδ: δξϊΰν ωμ λμ ϊλεπδ εωμ φιεο δϊΰξδ μιηιγδ')
-spearman_nonliba <- plotConnectionBetweenTraitsAndMetric(unitSuitabilityCorrelation_nonliba, 'μΰ μιαδ: δξϊΰν ωμ λμ ϊλεπδ εωμ φιεο δϊΰξδ μιηιγδ')
+spearman_liba <- plotConnectionBetweenTraitsAndMetric(unitSuitabilityCorrelation_liba, '????: ????? ?? ?? ????? ??? ???? ????? ??????')
+spearman_nonliba <- plotConnectionBetweenTraitsAndMetric(unitSuitabilityCorrelation_nonliba, '?? ????: ????? ?? ?? ????? ??? ???? ????? ??????')
 ggsave("out/spearman_liba.png",spearman_liba,height=150,width = 300, units = "mm")
 ggsave("out/spearman_nonliba.png",spearman_nonliba,height=150,width = 300, units = "mm")
 
@@ -201,10 +201,10 @@ ggsave("out/spearman_nonliba.png",spearman_nonliba,height=150,width = 300, units
 
 
 #Specific threshold
-hitmiss <- hitMissStats(scoresDF,threshold = 4, estimator = 'AvgScore')
+hitmiss <- hitMissStats(scoresDF,threshold = 4, estimator = 'UnitSuitability')
 
-hitmiss_liba <- hitMissStats(scoresDF %>% filter(Liba),threshold = 4, estimator = 'AvgScore')
-hitmiss_nonliba <- hitMissStats(scoresDF %>% filter(!Liba),threshold = 4, estimator = 'AvgScore')
+hitmiss_liba <- hitMissStats(scoresDF %>% filter(Liba),threshold = 4, estimator = 'UnitSuitability')
+hitmiss_nonliba <- hitMissStats(scoresDF %>% filter(!Liba),threshold = 4, estimator = 'UnitSuitability')
 
 #Specific threshold - final score
 hitmiss_final <- hitMissStats(scoresDF,threshold = 60, estimator = 'FinalScore')
@@ -270,5 +270,20 @@ for(maarih in relevantMegabshim){
   num <- num+1
   
 }
+
+reasons <- raw %>% 
+  group_by(Code) %>% 
+  summarize(
+    UnitSuitability = mean(UnitSuitability), 
+    FinalScore = FinalScore[1],
+    LeavingReason = LeavingReason[1],
+    Reason = Reason[1]) %>% 
+  filter(!is.na(LeavingReason))
+
+
+gall <- reasons %>% ggplot(aes(x = LeavingReason)) + geom_bar(aes(y = (..count..)/sum(..count..))) + ggtitle("ΧΧ΅Χ¤Χ¨ ΧΧ•Χ“Χ—Χ™Χ ΧΧ”ΧΧ΅ΧΧ•Χ ΧΧ¤Χ™ Χ΅Χ™Χ‘Χ”")
+
+g5 <- reasons %>% filter(UnitSuitability >=5) %>% ggplot(aes(x = LeavingReason)) + geom_bar(aes(y = (..count..)/sum(..count..))) + ggtitle("ΧΧ΅Χ¤Χ¨ ΧΧ•Χ“Χ—Χ™Χ ΧΧ”ΧΧ΅ΧΧ•Χ ΧΧ¤Χ™ Χ΅Χ™Χ‘Χ” ΧΆΧ‘Χ•Χ¨ Χ—Χ™Χ™ΧΧ™Χ Χ©Χ§Χ™Χ‘ΧΧ Χ• Χ¦Χ™Χ•Χ Χ”ΧªΧΧΧ” ΧΧ™Χ—Χ™Χ“Χ” Χ’Χ“Χ•Χ ΧΧ• Χ©Χ•Χ” Χ-5")
+gridExtra::grid.arrange(gall,g5)
 
 write.csv("output/megabshim.csv",x = hitMissMegabeshim)

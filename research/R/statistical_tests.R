@@ -142,7 +142,7 @@ hitMissConfusionMatrix <- function(scoresDF, threshold= 4,estimator = 'MaarihSco
   #print(confusionMatrix)
 }
 
-hitMissStats <- function(scoresDF, threshold = 4, estimator = 'MaarihScores'){
+hitMissStats <- function(scoresDF, threshold = 4, estimator = 'UnitSuitability'){
   
   if(!'FinishedFactor' %in% names(scoresDF)){
     scoresDF$FinishedFactor <- as.factor(scoresDF$FinishedMaslul)

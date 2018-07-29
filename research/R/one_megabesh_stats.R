@@ -43,7 +43,7 @@ statsPerMegabesh <- function(raw, megabeshName,megabeshNum,minSamples=10){
   }
   THRESHOLD = 4
   
-  hitMiss <- hitMissStats(thisMegabeshData)
+  hitMiss <- hitMissStats(thisMegabeshData,estimator = 'UnitSuitability')
   
   
   megabeshStats = data.frame(megabesh = megabeshName,
